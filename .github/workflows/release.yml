@@ -1,0 +1,44 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag matches the skill version
+        # Guard against publishing a release whose tag doesn't match the version
+        # declared in the SKILL frontmatter (the single source of truth).
+        run: |
+          frontmatter_ver="$(sed -n 's/^version:[[:space:]]*//p' skills/safer-dependencies.md | head -1 | tr -d '[:space:]')"
+          tag_ver="${GITHUB_REF_NAME#v}"
+          if [ "$frontmatter_ver" != "$tag_ver" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} (version ${tag_ver}) does not match skills/safer-dependencies.md version: ${frontmatter_ver}. Bump the skill version before tagging." >&2
+            exit 1
+          fi
+          echo "Tag ${GITHUB_REF_NAME} matches skill version ${frontmatter_ver}."
+
+      - name: Create release with auto-generated notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag

@@ -1,0 +1,21 @@
+# safer-dependencies.toml — per-project configuration.
+#
+# Drop this file at the repo root (next to .claude/settings.json) to
+# selectively disable ecosystems for the safer-dependencies hook.
+#
+# Default — when this file is absent or this section is empty — is that
+# every supported ecosystem is audited. Set a key to `false` to skip
+# audits for that ecosystem entirely.
+#
+# A project-level override here takes precedence over
+# ~/.config/safer-dependencies/config.toml. The SAFE_DEP_DISABLE env var
+# (comma-separated, e.g. `SAFE_DEP_DISABLE=pypi,go`) takes precedence
+# over both.
+
+[ecosystems]
+npm = true
+pypi = true
+rubygems = true
+maven = true
+go = true
+crates = true

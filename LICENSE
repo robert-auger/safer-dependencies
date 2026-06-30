@@ -1,0 +1,387 @@
+safer-dependencies License
+Version 1.0
+Copyright (c) 2026 Robert Auger
+
+=========================================================================
+PLAIN-LANGUAGE SUMMARY (non-binding — for convenience only)
+=========================================================================
+Anyone, including for-profit companies, may use, run, and modify this
+software for FREE for their own internal and business purposes — including
+using it to build, test, secure, or audit their own products and services,
+even products and services they sell. That internal use is, and stays, free.
+
+What you may NOT do without buying a separate commercial license is make
+money FROM THE SOFTWARE ITSELF: you may not sell it, charge for it, ship it
+inside a product or service that is sold, or run it to deliver its
+functionality to other people as a paid or commercial service (this includes
+hosted, cloud, SaaS, API, and managed-service delivery — even if you never
+hand anyone a copy of the code).
+
+You may share and fork the software for free, but you must keep this license
+and credit the original "safer-dependencies" project, and say so if you
+changed it.
+
+This summary is a friendly overview, not the contract. If anything here
+differs from the numbered Sections below, the numbered Sections control. This
+is intentionally NOT an OSI-approved "open source" license: the commercial
+limitation in Section 4 is a field-of-use limitation.
+
+=========================================================================
+OPERATIVE TERMS (these numbered Sections are the binding agreement)
+=========================================================================
+
+0. Acceptance, authority, and consideration
+   By accessing, downloading, using, running, copying, modifying, studying,
+   or distributing the Software, or by exercising any right described in
+   Section 2, You accept this license as a binding contract between You and
+   the Licensor and agree to be bound by it. If You do so on behalf of an
+   organization, You represent that You are authorized to bind that
+   organization, and "You" includes it. If You do not agree to these terms,
+   You are granted no rights and must not access or use the Software. The
+   mutual grants, permissions, and restrictions in this license are the
+   consideration exchanged by the parties. Independently of whether a
+   contract is formed, the permissions in Section 2 are a conditional
+   copyright license: Your only rights to copy, modify, run, or distribute
+   the Software arise from that license and exist only within its conditions
+   (Sections 3, 4, 5, and 8), and exceeding those conditions is copyright
+   infringement whether or not You assented to these terms. To the extent any
+   obligation cannot be enforced as a condition of the copyright license, it
+   is a contractual covenant that You accept by the acts described above.
+
+1. Definitions
+   "Software" means safer-dependencies, including its source code,
+   documentation, configuration, and any portion of it, in original or
+   modified form. References to "any portion" are subject to the de minimis
+   rule in Section 5(f).
+
+   "Licensor" means Robert Auger, the copyright holder.
+
+   "You" / "Your" means the individual or organization exercising rights
+   under this license, together with any affiliate, parent, or subsidiary
+   that You control or that is under common control with You, and Your
+   successors, agents, and contractors, in each case only when and to the
+   extent they are acting on Your behalf and at Your direction in exercising
+   rights under this license. Acts that such persons take on Your behalf and
+   at Your direction are attributed to You. This definition does not impose
+   obligations on, and is not intended to restrain the independent business
+   of, any person who has not accepted this license under Section 0;
+   circumvention through intermediaries is addressed by Section 4.
+
+   "Internal Use" means using and running the Software for Your own purposes
+   as described in, and within the limits of, Section 3.
+
+   "Fee" means any consideration of value, however characterized or labeled
+   (including a sale price, license fee, subscription, access charge, usage
+   or compute charge, hosting charge, support or maintenance charge,
+   integration or consulting charge, advertising or data-monetization
+   revenue, or bundling into a paid offering), whether paid directly or
+   indirectly and whether or not allocated to a line item that names the
+   Software. "Sold" and "for a Fee" are read accordingly.
+
+   "Commercial Product" means any product, service, platform, feature, or
+   offering that is provided to one or more third parties where either
+   (i) access to it is Sold or made available for a Fee, or (ii) it is part
+   of, bundled with, an inducement to, or otherwise contributes value to a
+   paid or revenue-generating offering (including via a free tier, free
+   feature, trial, advertising, subscription, or data monetization of a
+   larger offering that, taken as a whole, is paid or revenue-generating).
+   Purely Internal Use within Your organization, including sharing among Your
+   own teams, affiliates, or internal cost centers, is NOT a Commercial
+   Product.
+
+   "Provide as a Service" means to operate, host, run, or otherwise make the
+   functionality of the Software available to a third party — by hosted,
+   networked, cloud, SaaS, ASP, API, managed-service, plug-in, or platform
+   interface, or by any other means — such that the third party obtains the
+   benefit of that functionality, WHETHER OR NOT a copy of the Software is
+   delivered to them.
+
+   "Contribution" means any work of authorship intentionally submitted by You
+   to the Licensor or the project for inclusion in the Software (for example,
+   via pull request, patch, or issue attachment).
+
+2. Grant of rights
+   Subject to Your compliance with this entire license, and as expressly
+   conditioned on Sections 3, 4, 5, and 8, the Licensor grants You a
+   worldwide, non-exclusive, royalty-free, no-charge copyright license — for
+   the version of the Software to which this license is attached — to:
+   (a) use and run the Software for Your own purposes, as permitted and
+       limited by Section 3;
+   (b) modify the Software and create derivative works; and
+   (c) reproduce and distribute the Software and Your modifications.
+   This license continues until terminated under Section 8 and is revocable
+   upon breach as provided in this license. The rights in (a), (b), and (c)
+   are conditions defining the scope of the copyright license granted here;
+   exercising any right in the Software in a manner outside that scope
+   (including any act prohibited by Section 4 or any breach of Section 5) is
+   unlicensed and constitutes copyright infringement as well as breach of this
+   license. The copyright license to reproduce the Software includes, and is
+   limited to, the copies of the Software necessarily made in memory or storage
+   in order to run it (including any copy described in 17 U.S.C. § 117); that
+   reproduction license is granted only for use within the scope of Sections 3
+   and 4, and the reproduction, derivative-work, and distribution conditions of
+   this license are intended to have a direct nexus to the Licensor's rights
+   under 17 U.S.C. § 106. Running or operating the Software outside that scope —
+   including to Provide as a Service or otherwise in violation of Section 4 —
+   exceeds the copyright license to reproduce the Software and is therefore
+   copyright infringement. In any conflict, Sections 3, 4, 5, and 8 control over
+   this Section 2.
+
+3. Permitted Internal Use (this is, and stays, FREE)
+   You may use and run the Software, for free and for any purpose of Your
+   own, INCLUDING commercial business operations and including using the
+   Software to develop, build, test, secure, operate, or audit Your own
+   products and services — even products and services that You sell. By way
+   of example and to remove all doubt, a for-profit company running the
+   Software internally to audit or harden the dependencies of the company's
+   own products is permitted Internal Use and requires no payment.
+   Internal Use does NOT, however, include Providing the Software as a
+   Service to third parties or otherwise making the Software or its
+   functionality the thing that third parties obtain, which is governed by
+   Section 4. Delivering to a client a finished result or report that You
+   produced by Your own Internal Use of the Software is permitted; standing
+   the Software up as an interactive, automated, hosted, or recurring service
+   that a client or other third party operates or consumes is not.
+
+4. Prohibited commercial uses (require a separate commercial license)
+   Without first obtaining a separate written commercial license from the
+   Licensor under Section 12, You may NOT do any of the following, in whole
+   or in part, modified or unmodified:
+   (a) Sell the Software, or charge any Fee for the Software or for access to
+       or use of its functionality;
+   (b) include, embed, bundle, link (statically or dynamically), load, invoke
+       as a sub-process or sidecar, call via IPC, RPC, or network, expose
+       through a plug-in interface, or otherwise combine the Software so that
+       it supplies material functionality to a Commercial Product — process,
+       container, package, or network separation does not avoid this
+       restriction, and it makes no difference whether You, an intermediary,
+       or the end user performs the final combination, loading, or linking;
+   (c) Provide the Software as a Service as, or as part of, a Commercial
+       Product, including charging a Fee for hosting of, access to, support
+       for, or any service whose value derives materially from the Software's
+       functionality, and including operating the Software for or on behalf
+       of third parties; or
+   (d) distribute the Software together with, as a dependency of, as a
+       recommended or auto-installed component of, or designed or marketed to
+       be combined with a Commercial Product, even if the Software is
+       nominally free, separately packaged, or separately licensed (no "mere
+       aggregation" or "the user combines it" workaround).
+   These restrictions reach making the SOFTWARE'S OWN functionality the thing
+   a third party consumes for a Fee. They do NOT restrict selling products or
+   services that You merely built, tested, secured, or audited with the
+   Software, where the Software's own functionality is not itself made
+   available to Your customers as the offering or as a feature of it; that
+   case is the permitted Internal Use described in Section 3. You may not use
+   affiliates, subsidiaries, contractors, special-purpose entities, or staged
+   redistribution to accomplish indirectly what this Section prohibits. To
+   the extent Section 3 and this Section 4 conflict, this Section 4 controls.
+   Each restriction in this Section 4 is intended to operate first as a
+   condition on the copyright license in Section 2, so that a prohibited act is
+   copyright infringement; to the extent any restriction is held to lack a
+   sufficient nexus to the Licensor's exclusive rights to be enforced as a
+   copyright condition, that restriction is independently enforceable as a
+   contractual covenant that You accept under Section 0.
+
+5. Conditions and attribution
+   (a) Any distribution of the Software, and any derivative work, in original
+       or modified form, must retain this license text and the copyright
+       notice above, and must give clear, factual attribution to the original
+       project — "safer-dependencies" and its source repository
+       (https://github.com/robert-auger/safer-dependencies). The attribution
+       may be given as a plain-text notice (e.g., "based on / derived from the
+       safer-dependencies project at <URL>") and need not be a trademark-style
+       use of the name.
+   (b) If You modify the Software, You must add a notice — legible to the
+       intended audience of Your distribution — stating that You changed it
+       and that Your version is derived from the original safer-dependencies
+       project.
+   (c) If You Provide the Software as a Service to third parties under any
+       permitted or commercially licensed arrangement, You must display the
+       Section 5(a) attribution to those users, and, if Your version is
+       modified, state that it is changed and derived from safer-dependencies.
+       Purely internal deployments that are not third-party-facing incur no
+       additional display obligation under this subsection.
+   (d) This license grants no rights to the Licensor's name or trademarks
+       beyond the factual attribution required above. You may use the name
+       "safer-dependencies" solely as needed for that attribution. You may not
+       use it, or any Licensor name or mark, in any way that suggests
+       endorsement, sponsorship, or affiliation, and You may not adopt it as
+       the name or branding of Your modified version or present a modified
+       version so as to cause confusion.
+   (e) Attribution and change-notice obligations attached to copies You have
+       already distributed survive termination.
+   (f) De minimis: reproducing an insubstantial portion of the Software (for
+       example, a short code snippet, a configuration example, or a brief
+       documentation excerpt) for reference, commentary, education, or
+       interoperability does not by itself trigger Section 4 or the
+       full-text retention requirement of Section 5(a). Portions that are not
+       a substantial part of the Software, or that are independently created,
+       are not subject to Section 4, and this license restricts only uses
+       within the lawful scope of the Licensor's copyright and this contract.
+
+6. Contributions (inbound license)
+   Unless You and the Licensor agree otherwise in a signed writing, You grant
+   the Licensor, for each Contribution You submit, a perpetual, worldwide,
+   irrevocable, royalty-free, non-exclusive, transferable, and sublicensable
+   copyright and patent license to use, reproduce, modify, distribute, and
+   otherwise exploit the Contribution and to relicense it under any terms,
+   including commercial terms. You represent that You have the right to grant
+   this license. This inbound grant lets the Licensor offer commercial
+   licenses (Section 12) covering the whole Software, including
+   contributor-authored portions. The Licensor may require a signed or
+   click-through contributor agreement, or a Developer Certificate of Origin
+   sign-off plus this grant, as a condition of accepting a Contribution.
+
+7. Patents
+   (a) Each contributor (including the Licensor as to the Software) grants You
+       a non-exclusive, worldwide, royalty-free patent license to make, use,
+       and run the Software, limited to patent claims that the contributor's
+       own Contribution necessarily infringes, and only to the extent Your
+       use of the Software is permitted by this license.
+   (b) No other patent rights are granted, by implication, estoppel,
+       exhaustion, or otherwise, and all patent rights not expressly granted
+       are reserved.
+   (c) The patent license granted in 7(a) terminates automatically if You
+       (or any entity You control) initiate, or voluntarily join as a
+       plaintiff in, patent litigation alleging that the Software itself, or
+       Your permitted use of it, infringes a patent. This subsection does not
+       terminate the copyright license granted in Section 2, and does not
+       apply to a defensive patent counterclaim You assert in response to a
+       patent infringement claim first brought against You.
+
+8. Termination
+   (a) Commercial breach: any act prohibited by Section 4 terminates all
+       rights granted to You under this license immediately and
+       automatically, without a cure period.
+   (b) Attribution / notice breach: any breach of Section 5 terminates Your
+       rights, but Your rights are automatically reinstated if You cure the
+       breach within 30 days after You become aware of it or are notified by
+       the Licensor, provided this is Your first such breach; for repeated or
+       willful breaches, Your rights may be terminated without reinstatement.
+   (c) Discretionary reinstatement: rights terminated under 8(a), or not
+       automatically reinstated under 8(b), may be reinstated only by the
+       Licensor in writing.
+   (d) Cease use: upon termination You must immediately stop all use,
+       distribution, and commercialization of the Software and destroy all
+       copies in Your possession or control, except to the extent Section 5(e)
+       and Section 10 provide that obligations survive. Copies and derivatives that
+       remain within a Commercial Product after termination are unlicensed
+       and infringing.
+   (e) Downstream protection: each time the Software or a derivative is
+       distributed, each recipient automatically receives a license directly
+       from the Licensor on these same terms. You may not sublicense and may
+       not impose additional or different terms. Termination of Your rights
+       does not, by itself, terminate the rights of a good-faith downstream
+       recipient who is in compliance.
+
+9. Reservation of rights; no implied license
+   All rights not expressly granted are reserved by the Licensor. No license
+   or right is granted by implication, estoppel, exhaustion, or otherwise.
+   The broad language of Section 3 ("any purpose of Your own") does not
+   create any right to commercialize the Software in a manner prohibited by
+   Section 4.
+
+10. No warranty and no liability (free software)
+   THE SOFTWARE IS PROVIDED FREE OF CHARGE, "AS IS" AND "AS AVAILABLE", WITH
+   NO WARRANTY OR GUARANTEE OF ANY KIND, whether express, implied, or
+   statutory, including the implied warranties of MERCHANTABILITY, FITNESS FOR
+   A PARTICULAR PURPOSE, TITLE, and NON-INFRINGEMENT. The Licensor does not
+   warrant that the Software is accurate, complete, secure, uninterrupted, or
+   error-free, or that it will identify, prevent, or remediate any
+   vulnerability, insecure dependency, or other risk. You receive the Software
+   without any guarantee and assume the ENTIRE RISK of its use and results. To
+   the extent the California Uniform Commercial Code applies to this license,
+   the foregoing exclusions satisfy Commercial Code sections 2316 and 2719.
+
+   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSOR AND ITS
+   CONTRIBUTORS, MAINTAINERS, AFFILIATES, LICENSORS, AND AGENTS SHALL HAVE NO
+   LIABILITY TO YOU OR TO ANY THIRD PARTY OF ANY KIND arising from or in
+   connection with the Software or this license — including any direct,
+   indirect, incidental, special, consequential, exemplary, or punitive
+   damages, and any loss of profits, revenue, data, business, security, or
+   goodwill — whether in contract, tort (including negligence), strict
+   liability, or any other theory, and even if advised of the possibility of
+   such damages. Because the Software is provided at no charge, this complete
+   allocation of risk to You is an essential basis of the bargain and of the
+   Licensor's decision to make the Software available for free.
+
+   If applicable law does not permit the complete exclusion of liability
+   above, the Licensor's total aggregate liability for all claims is limited
+   to the smallest amount the law permits and in no event will exceed US$100.
+   Nothing in this license excludes or limits any liability that cannot
+   lawfully be excluded or limited under applicable law, including (under
+   California Civil Code section 1668 and otherwise) liability for fraud, for
+   willful injury to the person or property of another, for violation of law
+   whether willful or negligent, for gross negligence or willful misconduct,
+   or for death or personal injury caused by negligence.
+
+11. General terms
+   (a) Governing law and venue: This license is governed by the laws of the
+       State of California, United States, excluding its conflict-of-laws
+       rules and the U.N. Convention on Contracts for the International Sale
+       of Goods. The exclusive venue for any dispute is the state and federal
+       courts located in California, and You consent to personal jurisdiction
+       there and waive any objection based on forum non conveniens.
+   (b) Equitable relief: You acknowledge that a breach of Section 4 or
+       Section 5 would cause the Licensor irreparable harm for which monetary
+       damages are inadequate, and that the Licensor is entitled to seek
+       injunctive and other equitable relief, without the need to post a
+       bond, in addition to all other remedies.
+   (c) Severability and reformation: if any provision is held unenforceable,
+       it will be reformed to the minimum extent necessary to make it
+       enforceable while preserving its intent and, if it cannot be reformed,
+       severed; the remaining provisions stay in full force. The parties
+       specifically intend the Section 4 field-of-use limitation and the
+       Section 10 disclaimer/limitation to be enforced to the maximum extent
+       permitted by law.
+   (d) No waiver: no failure or delay by the Licensor in enforcing any
+       provision is a waiver; a waiver is effective only in a writing signed
+       by the Licensor and applies only to the specific instance and
+       provision.
+   (e) Assignment: this license is personal to You. You may not assign,
+       transfer, or sublicense it, in whole or in part, by agreement or by
+       operation of law (including by merger, acquisition, or change of
+       control), without the Licensor's prior written consent; rights to use
+       the Software in a Commercial Product do not pass by such a transaction
+       and require a commercial license. The Licensor may assign this license.
+       The automatic downstream grant in Section 8(e) is not an assignment.
+   (f) Survival: Sections 0, 1, 5(a)–(b) and 5(d)–(f), 6, 7(b), 8(d), 8(e), 9, 10,
+       11, and 12, and any obligations or liabilities accrued before
+       termination, survive termination or expiration.
+   (g) Entire agreement; amendments; versions: this license is the entire
+       agreement between You and the Licensor regarding the Software and
+       supersedes any prior or contemporaneous representation. No oral or
+       informal statement modifies it. The Licensor may publish future
+       versions under different terms; each copy of the Software is governed
+       by the version of this license distributed with it, and obtaining one
+       version gives You no rights under any other version.
+   (h) Export and sanctions: You will not use, export, or re-export the
+       Software in violation of any applicable export-control or sanctions
+       laws, and You represent that You are not barred from receiving the
+       Software under those laws.
+   (i) Nature of these terms; no restraint of trade. The permissions and
+       limitations in Sections 3, 4, and 5 are conditions defining the scope
+       of a copyright license in the Licensor's own work; they are not, and
+       are not intended to operate as, a restraint on You or any other person
+       from engaging in any lawful profession, trade, or business of any
+       kind. Nothing in this license restricts You from independently
+       developing, using, offering, hosting, or selling any product or
+       service — including one that competes with the Software or provides
+       similar or identical functionality — provided You do so without
+       copying, distributing, modifying, Providing as a Service, or making a
+       derivative work of the Software outside the scope granted here. This
+       license reaches only uses within the lawful scope of the Licensor's
+       copyright and this contract; it does not purport to control
+       independently created works or to bind any person who has not accepted
+       this license under Section 0. The parties intend that these terms be
+       enforced as copyright conditions and not as a covenant not to compete.
+
+12. How to obtain a commercial license
+   To use the Software in any way that Section 4 prohibits, You need a
+   separate written commercial license from the Licensor. To request one,
+   contact Robert Auger via GitHub at https://github.com/robert-auger (open
+   an issue on the project repository). No commercial rights arise unless and
+   until a separate written commercial license is signed by the Licensor.
+   Submitting a request is not the Licensor's consent and grants no rights.
+   Please do not post confidential commercial terms in a public issue; the
+   Licensor will provide a private channel.

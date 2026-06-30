@@ -1,0 +1,17 @@
+safer-dependencies
+Copyright (c) 2026 Robert Auger
+
+This software is source-available under the safer-dependencies License v1.0
+(see the LICENSE file). It is NOT OSI-approved open source.
+
+You may use and modify it for free for your own purposes, including for-profit
+and company internal use and to build products and services that you sell. A
+separate written commercial license is required ONLY to monetize the software
+itself — selling it, including it in a product or service that is sold, or
+providing its functionality to third parties for a fee (including hosted/SaaS
+delivery). See Section 4 of the LICENSE.
+
+If you redistribute this software or a derivative work, you must retain the
+LICENSE and this NOTICE and credit the original "safer-dependencies" project
+(https://github.com/robert-auger/safer-dependencies); modified versions must
+say they were changed. Commercial-license requests: https://github.com/robert-auger

@@ -1,0 +1,32 @@
+# Python caches / coverage / tool caches
+__pycache__/
+*.py[cod]
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets / credentials / local env — never commit these to a public repo.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+credentials
+credentials.*
+.netrc
+
+# Local state / logs / editor + OS cruft
+*.log
+safer-dependencies-audit-*.log
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
+*.swp
