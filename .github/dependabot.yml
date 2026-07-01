@@ -1,0 +1,21 @@
+# Dependabot configuration.
+#
+# The runtime is stdlib-only Python (no third-party runtime dependencies), so
+# the only supply-chain surface to keep current is the GitHub Actions used by
+# the release workflow. Dependabot opens a weekly PR when a pinned action has a
+# newer release, so the SHA pins stay on patched versions.
+#
+# Dependabot ALERTS and SECURITY UPDATES are enabled at the repo level
+# (Settings > Code security); this file adds scheduled VERSION UPDATES.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
