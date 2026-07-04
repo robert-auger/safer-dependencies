@@ -36,7 +36,7 @@ export SAFE_DEP_SCRIPTS_DIR="${SAFE_DEP_SCRIPTS_DIR:-${SHIM_DIR}/scripts}"
 # scripts/safedep/version.py. The normal path resolves the version from the
 # SKILL frontmatter via Python; this constant only matters when that path
 # is unreachable.
-SAFER_DEP_VERSION_FALLBACK="0.5.0"
+SAFER_DEP_VERSION_FALLBACK="0.5.1"
 
 # Preflight: the Python audit logic below imports `from safedep.http import ...`
 # at module scope. If scripts/safedep/ is missing — which happens when the

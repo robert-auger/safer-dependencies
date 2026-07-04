@@ -263,7 +263,7 @@ try:
     from safedep.version import attribution_header
     header = attribution_header()
 except Exception:
-    header = "[safer-dependencies 0.5.0]"
+    header = "[safer-dependencies 0.5.1]"
 r = json.load(sys.stdin)
 reason = r.get("reason", "blocked by safer-dependencies")
 out = {
@@ -292,7 +292,7 @@ try:
     from safedep.version import attribution_header
     header = attribution_header()
 except Exception:
-    header = "[safer-dependencies 0.5.0]"
+    header = "[safer-dependencies 0.5.1]"
 r = json.load(sys.stdin)
 reason = r.get("reason", "confirmation requested by safer-dependencies")
 out = {

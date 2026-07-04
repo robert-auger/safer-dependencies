@@ -9,10 +9,12 @@ Complete installation guide for `safer-dependencies`. For a high-level overview 
 - [Option C: Single project only](#option-c-single-project-only)
 - [Windows setup](#windows-setup)
 - [Post-Agent hooks (recommended)](#post-agent-hooks-recommended)
+- [Permissions allowlist](#permissions-allowlist)
 - [Verify installation](#verify-installation)
 - [Updating to the latest version](#updating-to-the-latest-version)
 - [Pinning to a release tag](#pinning-to-a-release-tag)
 - [In-session self-updater (`/safer-dependencies update`)](#in-session-self-updater-safer-dependencies-update)
+- [Uninstall](#uninstall)
 
 > **Platform note:** The shim requires bash and Python 3.9+. Works on macOS,
 > Linux, and Windows. The cross-process cache lock dispatches between
@@ -123,8 +125,11 @@ cp -r /tmp/safer-dependencies/skills/references ~/.claude/skills/safer-dependenc
 chmod +x ~/.claude/skills/safer-dependencies/shim.sh
 chmod +x ~/.claude/skills/safer-dependencies/pretooluse-bash.sh
 chmod +x ~/.claude/skills/safer-dependencies/posttooluse-bash.sh
-rm -rf /tmp/safer-dependencies
 ```
+
+> Keep the `/tmp/safer-dependencies` clone for now — the recommended
+> [Post-Agent hooks](#post-agent-hooks-recommended) copy two more scripts from
+> it. Delete it once everything is installed: `rm -rf /tmp/safer-dependencies`
 
 **Step 2 — Configure hooks** in `~/.claude/settings.json`:
 
@@ -171,6 +176,10 @@ rm -rf /tmp/safer-dependencies
 }
 ```
 
+**Step 3 — Add the [permissions allowlist](#permissions-allowlist)** to the
+same `~/.claude/settings.json`, so the skill's check commands run without a
+permission prompt on every audit.
+
 ## Option C: Single project only
 
 From your project root:
@@ -194,8 +203,11 @@ cp -r /tmp/safer-dependencies/skills/references .claude/skills/safer-dependencie
 chmod +x .claude/skills/safer-dependencies/shim.sh
 chmod +x .claude/skills/safer-dependencies/pretooluse-bash.sh
 chmod +x .claude/skills/safer-dependencies/posttooluse-bash.sh
-rm -rf /tmp/safer-dependencies
 ```
+
+> Keep the `/tmp/safer-dependencies` clone for now — the recommended
+> [Post-Agent hooks](#post-agent-hooks-recommended) copy two more scripts from
+> it. Delete it once everything is installed: `rm -rf /tmp/safer-dependencies`
 
 **Step 2 — Configure hooks** in `.claude/settings.json` at your project root:
 
@@ -244,7 +256,11 @@ rm -rf /tmp/safer-dependencies
 
 `${CLAUDE_PROJECT_DIR}` is set by Claude Code automatically; no path editing needed.
 
-**Step 3 — Commit** `.claude/` to your repo so the whole team gets it:
+**Step 3 — Add the [permissions allowlist](#permissions-allowlist)** to the
+same `.claude/settings.json`, so the skill's check commands run without a
+permission prompt on every audit.
+
+**Step 4 — Commit** `.claude/` to your repo so the whole team gets it:
 
 ```bash
 git add .claude/ && git commit -m "setup: add safer-dependencies security skill"
@@ -335,6 +351,54 @@ chmod +x ~/.claude/skills/safer-dependencies/safer-dependencies-pretooluse-agent
 
 For project-level install, swap `${HOME}/.claude` for `${CLAUDE_PROJECT_DIR}/.claude`.
 
+## Permissions allowlist
+
+**Why this matters:** the skill's checks shell out to registry and audit
+commands (`curl`, `npm view`, `pip-audit`, the `resolve_*.py` scripts, …).
+Without an allowlist, Claude Code stops and asks you to approve **every one
+of those commands, on every audit** — which makes the automatic hooks feel
+broken and trains you to click through prompts. The allowlist pre-approves
+exactly these read-only check commands and nothing else.
+
+The interactive installer (Option A) writes the six core command entries
+(`npm view`, `curl`, `npm audit`, `pip-audit`, `bundle audit`, `gem fetch`)
+for you; the block below is the complete set, including the resolver-script
+entries Normal Mode uses. **Manual installs (Options B and C) must add it by
+hand** — add the block below to
+`~/.claude/settings.json` (global install) or `.claude/settings.json`
+(project install), merging with any existing `permissions.allow` entries:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm view *)",
+      "Bash(curl -s --max-time 10 *)",
+      "Bash(npm audit *)",
+      "Bash(pip-audit *)",
+      "Bash(bundle audit *)",
+      "Bash(gem fetch *)",
+      "Bash(dependency-check *)",
+      "Bash(python3 */safer-dependencies/scripts/resolve_npm.py)",
+      "Bash(python3 */safer-dependencies/scripts/resolve_pypi.py)",
+      "Bash(python3 */safer-dependencies/scripts/resolve_rubygems.py)",
+      "Bash(python3 */safer-dependencies/scripts/resolve_maven.py)",
+      "Bash(python3 */safer-dependencies/scripts/first_publish_pypi.py)",
+      "Bash(python3 */safer-dependencies/scripts/first_publish_rubygems.py)",
+      "Bash(python3 */safer-dependencies/scripts/first_publish_maven.py)",
+      "Bash(python3 */safer-dependencies/scripts/github_repo_age.py)",
+      "Bash(python3 */safer-dependencies/scripts/pypi_hashes.py)",
+      "Bash(python3 */safer-dependencies/scripts/check_typosquat.py *)",
+      "Bash(python3 */safer-dependencies/scripts/audit_log_append.py)"
+    ]
+  }
+}
+```
+
+The Python entries are pinned to exact script filenames on purpose — a
+broad `Bash(python3 *)` rule would auto-approve arbitrary Python and defeat
+the point of the permission system.
+
 ## Verify installation
 
 Run these checks from a fresh terminal after install:
@@ -390,6 +454,17 @@ rm -rf /tmp/safer-dependencies
 
 After updating, re-run the `Verify installation` checks above.
 
+**Checking what version you're running:** the install procedure copies files
+into your skills directory but doesn't track the source tag. To check,
+inspect the source clone you used:
+
+```bash
+git -C /tmp/safer-dependencies describe --tags --always 2>/dev/null
+```
+
+(Empty output or "fatal: not a git repository" means the source clone was
+deleted after install — re-run the update procedure to refresh.)
+
 ## Pinning to a release tag
 
 The default update procedure tracks `origin/main` so you always get the
@@ -399,13 +474,13 @@ recommended for team / shared / production environments — replace
 
 ```bash
 git -C /tmp/safer-dependencies fetch --tags origin 2>/dev/null \
-  && git -C /tmp/safer-dependencies checkout v0.5.0 2>/dev/null \
-  || git clone --branch v0.5.0 --depth 1 https://github.com/robert-auger/safer-dependencies.git /tmp/safer-dependencies
+  && git -C /tmp/safer-dependencies checkout v0.5.1 2>/dev/null \
+  || git clone --branch v0.5.1 --depth 1 https://github.com/robert-auger/safer-dependencies.git /tmp/safer-dependencies
 ```
 
 Then re-run Step 1 of your install option as usual. The current latest
 release is listed at <https://github.com/robert-auger/safer-dependencies/releases>.
-See [Versioning](README.md#versioning) in the README for what each version bump means.
+See [Versioning policy](CHANGELOG.md#versioning-policy) in the changelog for what each version bump means.
 
 ## In-session self-updater (`/safer-dependencies update`)
 
@@ -422,3 +497,25 @@ Natural-language equivalent: say `"update safer-dependencies"` to Claude.
 **How it works:** the updater resolves the latest tag (or `main` as fallback) over HTTPS, clones the verified ref into a per-run `mkdtemp(0700)` directory (readable only by the current user), then copies the updated files into place using the **already-installed** manager. The freshly-cloned manager is never executed — only the trusted copy on disk drives the apply step. Your `settings.json` hook configuration is backed up before any file is written and auto-restored if the post-update health check fails.
 
 Every update operation (check, apply, rollback) is written to the audit log. For the trust model and tag-signing posture, see [SECURITY.md](SECURITY.md#self-update-trust-model).
+
+## Uninstall
+
+```bash
+# Global Uninstall
+rm -rf ~/.claude/skills/safer-dependencies
+
+# Project Uninstall
+rm -rf .claude/skills/safer-dependencies
+```
+
+Then remove the hook entries from your `settings.json` — **this step matters**:
+otherwise Claude Code will keep trying to invoke the deleted scripts on every
+tool call and log errors. Remove every entry whose `command` references the
+`safer-dependencies` directory:
+
+- `PostToolUse` matchers: `Write`, `Edit`, `Bash`
+- `PreToolUse` matchers: `Bash`
+- `PreToolUse` matcher `Agent` and `PostToolUse` matcher `Agent` (the Post-Agent hooks)
+
+Optionally also remove the [permissions allowlist](#permissions-allowlist)
+entries — they're harmless on their own but no longer needed.
