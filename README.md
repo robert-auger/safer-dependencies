@@ -2,12 +2,15 @@
 
 Automatically checks dependencies that Claude adds through its `Write`, `Edit`, and `Bash` tools, and auto-corrects vulnerable versions in place. Runs provenance, version age, vulnerability, and hash-integrity checks across npm, PyPI, RubyGems, Maven, Go, Rust, and PHP (Composer). Coverage is scoped to writes that go through Claude's tools (Intercept Mode corrects a vulnerable pin *after* the file lands, within the same tool cycle — not before); see [CAPABILITIES.md](CAPABILITIES.md) for exactly what is and isn't covered. 
 
+> **New here?** [GETTING-STARTED.md](GETTING-STARTED.md) takes you from zero to a working install in about five minutes.
+
 > **Security & privacy:** see [SECURITY.md](SECURITY.md) (vulnerability disclosure), [PRIVACY.md](PRIVACY.md) (data egress, no telemetry), and [CAPABILITIES.md](CAPABILITIES.md) (what the tool defends against and what it doesn't).
 
 > **License (source-available — NOT OSI "open source"):** Free to use and modify for your own purposes, **including for-profit/company internal use and building products you sell**. A separate paid license is required **only** to monetize the software *itself* — selling it, shipping it inside a product or service that is sold, or offering its functionality to third parties for a fee (including hosted/SaaS/API). Redistribution and derivatives must keep the license and credit this project. See **[LICENSE](LICENSE)** (Section 4 for the commercial restriction); commercial-license requests via [github.com/robert-auger](https://github.com/robert-auger).
 
 ## Contents
 
+- [Getting started](GETTING-STARTED.md) — zero to installed in about five minutes
 - [What it does](#what-it-does)
 - [How it works](#how-it-works)
   - [Normal Mode (Manual)](#normal-mode-manual)
@@ -19,14 +22,10 @@ Automatically checks dependencies that Claude adds through its `Write`, `Edit`, 
 - [What's in this repo](#whats-in-this-repo)
 - [Supported ecosystems](#supported-ecosystems)
 - [Install](#install)
-- [Versioning](#versioning)
-- [Configuration](#configuration)
-  - [Auto-approve Check Commands (Optional)](#auto-approve-check-commands-optional)
+  - [Configuration](#configuration)
 - [Warning levels](#warning-levels)
 - [Audit log](#audit-log)
 - [Requirements](#requirements)
-- [Keeping safer-dependencies up to date](#keeping-safer-dependencies-up-to-date)
-- [Uninstall](#uninstall)
 - [FAQ](#faq)
 
 ## What it does
@@ -305,90 +304,31 @@ The skill file alone is not enough — without hooks, automatic invocation depen
 | Maven | `pom.xml`, `build.gradle`, `libs.versions.toml` | -- |
 | Go | `go.mod` | `go.sum` |
 | Rust | `Cargo.toml` | `Cargo.lock` |
+| PHP (Composer) | `composer.json` | `composer.lock` |
 
 ## Install
 
-**Bootstrap (first install)** — runs the interactive installer that prompts for scope (global vs project) and which hooks to enable, writes `settings.json`, and validates the setup:
+New to the project? Start with **[GETTING-STARTED.md](GETTING-STARTED.md)**. The short version:
 
 ```bash
 git clone https://github.com/robert-auger/safer-dependencies /tmp/safer-dependencies
 python3 /tmp/safer-dependencies/skills/scripts/safer_dependencies_manager.py interactive_install
 ```
 
-**After install** — re-runs, updates, stats, and health checks all work via natural language to Claude (no need to remember the CLI):
+The installer prompts for scope (global vs project) and which hooks to enable, then writes `settings.json` for you — both the hook entries **and** the permissions allowlist that lets the skill's check commands run without an approval prompt on every audit.
 
-| What you want | Say to Claude |
-|---|---|
-| Refresh / change which hooks are enabled | `install safer-dependencies` |
-| Update to a newer version | re-run the bootstrap command; the installer is idempotent and preserves your `settings.json` customisations |
-| See usage stats | `show safer-dependencies stats` |
-| Confirm the setup is healthy | `check safer-dependencies setup` |
+Everything else install-related lives in **[INSTALLATION.md](INSTALLATION.md)**, the single reference for install mechanics: manual file-by-file installs (global and project-level), Windows specifics, Post-Agent hooks, the [permissions allowlist](INSTALLATION.md#permissions-allowlist), verifying the setup, updating, pinning to a release tag, and uninstalling.
 
-For manual file-by-file install (advanced users, air-gapped, or setups without `git clone` access), see [INSTALLATION.md](INSTALLATION.md) — covers global (Option B), project-level (Option C), Windows specifics, Post-Agent hooks, verification, and release pinning.
+After install, day-to-day management works via natural language to Claude — `install safer-dependencies` (re-run / change hooks), `show safer-dependencies stats`, `check safer-dependencies setup` — or the `/safer-dependencies` menu. Updating is in-session too: `/safer-dependencies update` applies the latest release (`update --check` for a dry-run, `update --rollback` to undo); see [INSTALLATION.md](INSTALLATION.md#in-session-self-updater-safer-dependencies-update) for the trust model.
 
 > **Platform note:** macOS, Linux, and Windows are supported. Windows needs Git for Windows (provides bash) and Python 3 on `PATH` — no WSL required.
 
-## Versioning
+### Configuration
 
-Releases follow [SemVer](https://semver.org/) starting at `v0.1.0`.
+Two things are configurable after install:
 
-| Bump | Triggers |
-|---|---|
-| **Major** (`v1 → v2`) | Breaking changes to hook contracts (e.g. removing a hook script or matcher), to the `settings.json` schema users are expected to ship, or to the audit-log JSON schema (field removed, renamed, or type-changed) |
-| **Minor** (`v0.1 → v0.2`) | New ecosystems, new operating modes, new signal types, new `source.component` values, new optional `source` fields, new opt-in env vars |
-| **Patch** (`v0.1.0 → v0.1.1`) | Bug fixes, doc fixes, internal refactors, performance work, dependency-only changes |
-
-Pre-1.0 (current): minor versions may still introduce small breaking
-changes if a clear correctness bug requires it. Each release's notes
-call out any user-visible change. The full release history lives on the
-[Releases page](https://github.com/robert-auger/safer-dependencies/releases).
-
-**How to know what version you're running:** the install procedure
-copies files into your skills directory but doesn't track the source
-tag. To check, inspect the source clone you used:
-
-```bash
-git -C /tmp/safer-dependencies describe --tags --always 2>/dev/null
-```
-
-(Empty output or "fatal: not a git repository" means the source clone
-was deleted after install — re-run the update procedure to refresh.)
-
-
-## Configuration
-
-### Auto-approve Check Commands (Optional)
-
-By default Claude will prompt you to approve each `curl`, `npm view`, etc. To auto-approve the commands this skill uses, add these to your `.claude/settings.json`:
-
-```json
-{
-  "permissions": {
-    "allow": [
-      "Bash(npm view *)",
-      "Bash(curl -s --max-time 10 *)",
-      "Bash(npm audit *)",
-      "Bash(pip-audit *)",
-      "Bash(bundle audit *)",
-      "Bash(gem fetch *)",
-      "Bash(dependency-check *)",
-      "Bash(python3 */safer-dependencies/scripts/resolve_npm.py)",
-      "Bash(python3 */safer-dependencies/scripts/resolve_pypi.py)",
-      "Bash(python3 */safer-dependencies/scripts/resolve_rubygems.py)",
-      "Bash(python3 */safer-dependencies/scripts/resolve_maven.py)",
-      "Bash(python3 */safer-dependencies/scripts/first_publish_pypi.py)",
-      "Bash(python3 */safer-dependencies/scripts/first_publish_rubygems.py)",
-      "Bash(python3 */safer-dependencies/scripts/first_publish_maven.py)",
-      "Bash(python3 */safer-dependencies/scripts/github_repo_age.py)",
-      "Bash(python3 */safer-dependencies/scripts/pypi_hashes.py)",
-      "Bash(python3 */safer-dependencies/scripts/check_typosquat.py *)",
-      "Bash(python3 */safer-dependencies/scripts/audit_log_append.py)"
-    ]
-  }
-}
-```
-
-Place this file at `~/.claude/settings.json` (global) or `.claude/settings.json` (project-level).
+- **Permissions allowlist** — pre-approves the skill's read-only check commands (`curl`, `npm view`, `pip-audit`, …) so audits run without an approval prompt each time. The interactive installer writes the core entries for you; manual installs add the full block by hand. Full block and rationale: [INSTALLATION.md → Permissions allowlist](INSTALLATION.md#permissions-allowlist).
+- **Security policy** — the release-age cooldown window/mode and a per-check `off`/`warn`/`block` tier for every check type, edited with `/safer-dependencies config` and stored in `~/.config/safer-dependencies/config.toml`. Schema and tier semantics: [`skills/references/configuration.md`](skills/references/configuration.md).
 
 ## Warning levels
 
@@ -535,39 +475,6 @@ When the shim runs in dry-run mode (`SAFE_DEP_DRY_RUN=1`), entries also include 
   - `pip-audit` for Python packages
   - `bundle` for Ruby packages
   - `dependency-check` for Java packages
-
-## Keeping safer-dependencies up to date
-
-`/safer-dependencies update` is a hardened self-updater that fetches the latest code from GitHub over HTTPS, isolates the clone in a per-run `mkdtemp(0700)` directory, and applies the update by **copying files into place** via the already-installed manager (the freshly-cloned manager is never executed). Settings and hook configuration in `settings.json` are backed up automatically and rolled back on a failed health check.
-
-| Command | Effect |
-|---|---|
-| `update` | Preview pending change (interactive sessions prompt for confirmation), then apply |
-| `update --check` | Dry-run: resolve the latest ref and report what would change, no files written |
-| `update --rollback` | Restore the previous bundle from the automatic pre-update backup |
-
-Natural-language equivalent: say `"update safer-dependencies"` to Claude -- it routes to the same logic.
-
-Every update operation is recorded in the audit log. For the full trust model (HTTPS chain, GitHub trust ceiling, tag-signing posture), see [SECURITY.md](SECURITY.md#self-update-trust-model).
-
-
-## Uninstall
-
-```bash
-# Global Uninstall
-rm -rf ~/.claude/skills/safer-dependencies
-
-# Project Uninstall
-rm -rf .claude/skills/safer-dependencies
-```
-
-Then remove the hook entries from your `settings.json` — otherwise Claude Code
-will try to invoke the deleted scripts and log errors. Remove every entry
-whose `command` references the `safer-dependencies` directory:
-
-- `PostToolUse` matchers: `Write`, `Edit`, `Bash`
-- `PreToolUse` matchers: `Bash`
-- `PreToolUse` matcher `Agent` and `PostToolUse` matcher `Agent` (the Post-Agent hooks)
 
 ## FAQ
 

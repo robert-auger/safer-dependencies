@@ -10,7 +10,7 @@
 
 **What Claude reports back to the user:**
 ```
-[safer-dependencies 0.5.0] ⚠️  CRITICAL — aiohttp@3.8.5 (PyPI)
+[safer-dependencies 0.5.1] ⚠️  CRITICAL — aiohttp@3.8.5 (PyPI)
    Issue: [layer 3] 33 unmitigated CVEs in this version
    Detail: 
      - CVE-2023-32315 (HIGH): Multipart form data injection
@@ -18,7 +18,7 @@
      - 31 other CVEs ranging from HIGH to LOW
    Action: Stepping back to aiohttp@3.9.0 (clean)
 
-[safer-dependencies 0.5.0] ✓ aiohttp@3.9.0 (PyPI) — clean
+[safer-dependencies 0.5.1] ✓ aiohttp@3.9.0 (PyPI) — clean
    All four security layers passed
    Version age: 120 days ✓
    No CVEs found
@@ -50,7 +50,7 @@ Claude would then:
 
 **What Claude reports back to the user:**
 ```
-[safer-dependencies 0.5.0] ✓ @apollo/client@3.7.0 (npm) — clean
+[safer-dependencies 0.5.1] ✓ @apollo/client@3.7.0 (npm) — clean
    Layer 1a: Official registry (npmjs.org) ✓
    Layer 1b: No typosquat (similar to known packages: apollo, react-apollo)
    Layer 2: Version age: 95 days ✓
@@ -67,8 +67,8 @@ npm install
 
 When lock file is generated, skill auto-checks transitive dependencies:
 ```
-[safer-dependencies 0.5.0] ✓ 47 transitive dependencies clean (npm)
-[safer-dependencies 0.5.0] ⚠️  HIGH [transitive] — ua-parser-js@1.0.29 (npm)
+[safer-dependencies 0.5.1] ✓ 47 transitive dependencies clean (npm)
+[safer-dependencies 0.5.1] ⚠️  HIGH [transitive] — ua-parser-js@1.0.29 (npm)
    Issue: [layer 1c] Package first published 15 days ago
    Detail: Published: 2026-03-24. Still within initial vetting period.
    Action: Proceeding — transitive dependency added by browserslist
@@ -86,7 +86,7 @@ When lock file is generated, skill auto-checks transitive dependencies:
 
 **Output:**
 ```
-[safer-dependencies 0.5.0] 📦 RECOMMENDED — rails 6.1.0 → 7.0.4 (MAJOR bump) (RubyGems)
+[safer-dependencies 0.5.1] 📦 RECOMMENDED — rails 6.1.0 → 7.0.4 (MAJOR bump) (RubyGems)
    Reason: Rails 7.0.4 contains fixes for 8 HIGH severity CVEs not in 6.1.0
    Vuln check: 
      - rails 6.1.0: CVE-2023-22794 (HIGH), CVE-2023-22795 (HIGH), ...
@@ -148,14 +148,14 @@ Co-Authored-By: safer-dependencies skill
 
 **What Claude reports back to the user:**
 ```
-[safer-dependencies 0.5.0] ⚠️  CRITICAL — log4j-core@2.14.1 (Maven)
+[safer-dependencies 0.5.1] ⚠️  CRITICAL — log4j-core@2.14.1 (Maven)
    Issue: [layer 3] Critical RCE vulnerability (Log4Shell)
    Detail: 
      - CVE-2021-44228 (CRITICAL): Remote code execution via JNDI injection
      - CVE-2021-45046 (CRITICAL): Additional RCE via incomplete fix
    Action: Updating to log4j-core@2.20.0 (clean)
 
-[safer-dependencies 0.5.0] ✓ log4j-core@2.20.0 (Maven) — clean
+[safer-dependencies 0.5.1] ✓ log4j-core@2.20.0 (Maven) — clean
    All security checks passed
    Version age: 120 days ✓
    No CVEs in vulnerability database ✓
@@ -191,7 +191,7 @@ Claude refactors any code that might be exploitable by the CVE and runs `mvn tes
 **What Claude reports back to the user:**
 ```
 \033[1;31mALERT TYPOSQUAT\033[0m
-[safer-dependencies 0.5.0] 🛑 BLOCKED — reqests (PyPI)
+[safer-dependencies 0.5.1] 🛑 BLOCKED — reqests (PyPI)
    Issue: [layer 1b] Possible typosquat detected
    Detail: "reqests" is 1 edit from "requests" (well-known package)
 
@@ -205,13 +205,13 @@ Claude refactors any code that might be exploitable by the CVE and runs `mvn tes
 
 **Skill restarts from Step 1 with "requests", all checks pass, writes to manifest:**
 ```
-[safer-dependencies 0.5.0] ✓ requests@2.31.0 (PyPI) — clean
+[safer-dependencies 0.5.1] ✓ requests@2.31.0 (PyPI) — clean
 ```
 `requests==2.31.0` is written to `requirements.txt`. `reqests` is never written anywhere.
 
 **If user chooses B** (intentional — very rare):
 ```
-[safer-dependencies 0.5.0] ✓ reqests@<version> (PyPI) — clean
+[safer-dependencies 0.5.1] ✓ reqests@<version> (PyPI) — clean
    Note: proceeding with user-confirmed name. Audit log signals entry: "NOTE: user confirmed override of typosquat warning for reqests"
 ```
 
@@ -235,11 +235,11 @@ No package is added. User is informed they can investigate `reqests` before retr
 
 **Lock file generated, skill checks transitive deps:**
 ```
-[safer-dependencies 0.5.0] ✓ express@4.18.2 (npm) — clean
+[safer-dependencies 0.5.1] ✓ express@4.18.2 (npm) — clean
 
-[safer-dependencies 0.5.0] ✓ 50 transitive dependencies clean (npm)
+[safer-dependencies 0.5.1] ✓ 50 transitive dependencies clean (npm)
 
-[safer-dependencies 0.5.0] ⚠️  HIGH [transitive] — minimist@1.2.5 (npm)
+[safer-dependencies 0.5.1] ⚠️  HIGH [transitive] — minimist@1.2.5 (npm)
    Issue: [layer 3] Prototype pollution in argument parsing
    Detail: CVE-2021-44906: Prototype pollution via __proto__
    Action: Proceeding — minimist arrived transitively through express's
