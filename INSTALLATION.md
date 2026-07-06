@@ -354,31 +354,34 @@ For project-level install, swap `${HOME}/.claude` for `${CLAUDE_PROJECT_DIR}/.cl
 ## Permissions allowlist
 
 **Why this matters:** the skill's checks shell out to registry and audit
-commands (`curl`, `npm view`, `pip-audit`, the `resolve_*.py` scripts, …).
-Without an allowlist, Claude Code stops and asks you to approve **every one
-of those commands, on every audit** — which makes the automatic hooks feel
-broken and trains you to click through prompts. The allowlist pre-approves
-exactly these read-only check commands and nothing else.
+commands. Without an allowlist, Claude Code stops and asks you to approve
+**every one of those commands, on every audit** — which trains you to click
+through prompts. This pre-approves a fixed set of read-only checks.
 
-The interactive installer (Option A) writes the six core command entries
-(`npm view`, `curl`, `npm audit`, `pip-audit`, `bundle audit`, `gem fetch`)
-for you; the block below is the complete set, including the resolver-script
-entries Normal Mode uses. **Manual installs (Options B and C) must add it by
-hand** — add the block below to
-`~/.claude/settings.json` (global install) or `.claude/settings.json`
-(project install), merging with any existing `permissions.allow` entries:
+Two profiles are offered. **Start with the Safer profile — it is the
+Recommended default and the exact set the interactive installer writes.** Add
+the Convenience entries only if the extra prompts bother you and you accept the
+trade-offs described below.
+
+### Safer profile (Recommended)
+
+Every registry/audit rule is an exact string — no argument wildcards on network
+tools — so none can be redirected to an arbitrary host or escalated to a
+write/fix operation. The interactive installer (Option A) writes the four
+audit-tool rules for you; the `python3 …/scripts/*.py` resolver-script rules are
+used by Normal (manual) mode, so **manual installs (Options B and C) add the
+whole block by hand** to `~/.claude/settings.json` (global install) or
+`.claude/settings.json` (project install), merging with any existing
+`permissions.allow` entries:
 
 ```json
 {
   "permissions": {
     "allow": [
-      "Bash(npm view *)",
-      "Bash(curl -s --max-time 10 *)",
-      "Bash(npm audit *)",
-      "Bash(pip-audit *)",
-      "Bash(bundle audit *)",
-      "Bash(gem fetch *)",
-      "Bash(dependency-check *)",
+      "Bash(npm audit --json)",
+      "Bash(npm audit)",
+      "Bash(bundle audit check)",
+      "Bash(bundle audit check --update)",
       "Bash(python3 */safer-dependencies/scripts/resolve_npm.py)",
       "Bash(python3 */safer-dependencies/scripts/resolve_pypi.py)",
       "Bash(python3 */safer-dependencies/scripts/resolve_rubygems.py)",
@@ -395,9 +398,30 @@ hand** — add the block below to
 }
 ```
 
-The Python entries are pinned to exact script filenames on purpose — a
-broad `Bash(python3 *)` rule would auto-approve arbitrary Python and defeat
-the point of the permission system.
+`curl` is intentionally **not** pre-approved — a permission rule cannot safely
+constrain it to specific hosts (curl's `--next`, multiple-URL, and `-o` flags
+defeat any host-scoped rule), so PyPI/RubyGems/Maven registry fetches will
+prompt. `npm audit` and `bundle audit` are pinned to their read-only forms.
+
+### Convenience profile (fewer prompts, slightly riskier attack surface)
+
+Each line below removes prompts for one workflow but pre-approves a tool whose flags a trailing `*` cannot restrict. <b>There is a slight risk another attack within claude could make use of these allowlisted rules, be aware of that risk and carefully determine if this is worth the risk</b>. Add them individually — you do not need all three.
+
+```json
+      "Bash(npm view *)",
+      "Bash(pip-audit *)",
+      "Bash(gem fetch *)"
+```
+
+| Rule | Buys you | Risk once pre-approved |
+|------|----------|------------------------|
+| `Bash(npm view *)` | npm version/metadata resolution without prompts | `--registry <url>` can reach an arbitrary host (the last `--registry` wins, so it cannot be pinned); metadata-only, no code execution |
+| `Bash(pip-audit *)` | PyPI vulnerability scans without prompts | `--index-url`/`-r` can point at an attacker index and **build an sdist (`setup.py` runs) — code execution**; the highest-risk of the three |
+| `Bash(gem fetch *)` | nothing today — the skill does not currently invoke `gem fetch` | `--source <url>` reaches an arbitrary host and writes a `.gem` into the working dir; **no current benefit — best left out** |
+
+These are **session-wide** grants: once added, any command in the session —
+including one introduced by a prompt-injected instruction — can use them
+without a prompt. <b>That is a security trade-off for fewer prompts, use at your own risk!</b>
 
 ## Verify installation
 
@@ -474,8 +498,8 @@ recommended for team / shared / production environments — replace
 
 ```bash
 git -C /tmp/safer-dependencies fetch --tags origin 2>/dev/null \
-  && git -C /tmp/safer-dependencies checkout v0.5.1 2>/dev/null \
-  || git clone --branch v0.5.1 --depth 1 https://github.com/robert-auger/safer-dependencies.git /tmp/safer-dependencies
+  && git -C /tmp/safer-dependencies checkout v0.5.2 2>/dev/null \
+  || git clone --branch v0.5.2 --depth 1 https://github.com/robert-auger/safer-dependencies.git /tmp/safer-dependencies
 ```
 
 Then re-run Step 1 of your install option as usual. The current latest

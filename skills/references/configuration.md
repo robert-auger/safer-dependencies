@@ -10,13 +10,10 @@ add this block to `.claude/settings.json`. Requires the shim installed at
 {
   "permissions": {
     "allow": [
-      "Bash(npm view *)",
-      "Bash(curl -s --max-time 10 *)",
-      "Bash(npm audit *)",
-      "Bash(pip-audit *)",
-      "Bash(bundle audit *)",
-      "Bash(gem fetch *)",
-      "Bash(dependency-check *)"
+      "Bash(npm audit --json)",
+      "Bash(npm audit)",
+      "Bash(bundle audit check)",
+      "Bash(bundle audit check --update)"
     ]
   },
   "hooks": {
@@ -254,10 +251,10 @@ The hook fires automatically after every manifest write. Same-major CVE fixes ar
    {
      "permissions": {
        "allow": [
-         "Bash(npm view *)",
-         "Bash(curl -s --max-time 10 *)",
-         "Bash(pip-audit *)",
-         "Bash(bundle audit *)"
+         "Bash(npm audit --json)",
+         "Bash(npm audit)",
+         "Bash(bundle audit check)",
+         "Bash(bundle audit check --update)"
        ]
      },
      "hooks": {

@@ -12,6 +12,7 @@ import pathlib
 import re
 import shutil
 import subprocess
+import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, List, Any
@@ -36,6 +37,11 @@ REPO_URL = "https://github.com/robert-auger/safer-dependencies"
 # from REPO_URL so transferring orgs only requires editing REPO_URL.
 _RAW_BASE = REPO_URL.replace("https://github.com/", "https://raw.githubusercontent.com/")
 UPSTREAM_VERSION_URL = f"{_RAW_BASE}/main/skills/safer-dependencies.md"
+
+# Docs section explaining the recommended (Safer) vs opt-in (Convenience)
+# permission allowlist. Derived from REPO_URL so it stays correct after the
+# public-repo publish scrub rewrites the org/repo slug.
+PERMISSIONS_DOCS_URL = f"{REPO_URL}/blob/main/INSTALLATION.md#permissions-allowlist"
 
 _TOP_PACKAGES_LIMIT = 3
 
@@ -219,13 +225,15 @@ class SaferDependenciesManager:
             self._display_installation_header(existing)
             use_global = self._prompt_for_scope()
             hook_selections = self._prompt_for_hooks()
-            return self.apply_install(use_global, hook_selections)
+            from_version = self._installed_skill_version(use_global)
+            remove_legacy = self._confirm_legacy_removal(use_global, from_version)
+            return self.apply_install(use_global, hook_selections, remove_legacy=remove_legacy)
         except PermissionError as e:
             return {'status': 'error', 'summary': f'Installation failed due to permission error: {e}', 'installed': []}
         except Exception as e:  # noqa: BLE001
             return {'status': 'error', 'summary': f'Installation failed: {e}', 'installed': []}
 
-    def apply_install(self, use_global, hook_selections, existing_entries=None, allow_placeholder=True):
+    def apply_install(self, use_global, hook_selections, existing_entries=None, allow_placeholder=True, remove_legacy=True):
         """Prompt-free installer core. Reused by interactive_install and self_update.
 
         Args:
@@ -240,6 +248,10 @@ class SaferDependenciesManager:
                 Task 9's self_update orchestrator will pass False so a working install is
                 never downgraded to a stub.
         """
+        # issue #3: read the version already installed for this scope BEFORE the
+        # skill file is overwritten, so the permission migration can tell a
+        # potentially vulnerable (or older) install (remediate) from a newer one (leave alone).
+        from_version = self._installed_skill_version(use_global)
         installed_components = []
         installed_components.extend(self._install_skill_file(use_global, allow_placeholder=allow_placeholder))
         installed_components.extend(
@@ -248,8 +260,15 @@ class SaferDependenciesManager:
         settings_result = self._configure_settings(hook_selections, use_global, existing_entries)
         if settings_result.get('_updated'):
             installed_components.append('settings.json')
-        if self._configure_permissions(use_global).get('updated'):
+        perm_result = self._configure_permissions(use_global, from_version=from_version, remove_legacy=remove_legacy)
+        if perm_result.get('updated'):
             installed_components.append('permissions configuration')
+        if perm_result.get('removed'):
+            print(
+                f"Removed {len(perm_result['removed'])} legacy over-broad permission "
+                f"rule(s) from settings.json (issue #3): "
+                f"{', '.join(perm_result['removed'])}"
+            )
         validation = self.validate_installation()
         status = 'success' if validation['valid'] else 'warning'
         summary = (f'Successfully installed safer-dependencies with {len(installed_components)} components'
@@ -346,6 +365,11 @@ class SaferDependenciesManager:
             for scope in cfg["scopes"]:
                 backup = self._backup_scope(scope, ts)
                 try:
+                    # self_update only reaches this apply loop after an explicit
+                    # --yes/confirm, so it auto-remediates the legacy rules with
+                    # no interactive prompt (the opt-in prompt lives in
+                    # interactive_install, where a human is present). apply_install
+                    # still prints a notice of what it removed.
                     self._source_dir = clone / "skills"
                     self.apply_install(
                         scope["use_global"], scope["hook_selections"],
@@ -783,6 +807,23 @@ class SaferDependenciesManager:
                 "written by subagents bypass the other hooks and will not be "
                 "audited."
             )
+
+        # issue #3: surface an un-remediated over-broad curl rule so "check
+        # setup" tells the user to re-run the installer (or remove it by hand).
+        for scope_dir in (self.claude_dir, self.project_claude_dir):
+            try:
+                data = json.loads((scope_dir / "settings.json").read_text(encoding="utf-8"))
+                allow = data.get("permissions", {}).get("allow", [])
+            except (OSError, json.JSONDecodeError, AttributeError):
+                continue
+            if self.LEGACY_MARKER in allow:
+                warnings.append(
+                    "settings.json still contains the over-broad rule "
+                    "'Bash(curl -s --max-time 10 *)' (issue #3) — it pre-approves "
+                    "curl to any host. Re-run the installer or 'update "
+                    "safer-dependencies' to remove it, or delete it by hand."
+                )
+                break
 
         return {
             'valid': len(issues) == 0,
@@ -1881,9 +1922,9 @@ exit 0
 
             existing_settings['hooks'][hook_type].extend(hook_configs)
 
-        # Write updated settings
+        # Write updated settings atomically (crash-safe; see _atomic_write_json).
         settings_file.parent.mkdir(parents=True, exist_ok=True)
-        settings_file.write_text(json.dumps(existing_settings, indent=2))
+        self._atomic_write_json(settings_file, existing_settings)
 
         # Return the settings structure for testing, but also indicate success
         existing_settings['_updated'] = True
@@ -1892,6 +1933,29 @@ exit 0
     # Bash allowlist entries the Normal-mode skill needs to run registry queries
     # and vulnerability scans without per-call permission prompts.
     REQUIRED_PERMISSIONS = [
+        # Safer profile (issue #3 hardening). Audit tools are pinned to their
+        # exact read-only forms so `npm audit fix --force` / `bundle audit
+        # ... --output` cannot match. curl / npm view / pip-audit / gem fetch /
+        # dependency-check are deliberately NOT here — they cannot be safely
+        # host-scoped by a permission prefix rule (see the Convenience profile
+        # in INSTALLATION.md, which is opt-in only). The Normal-mode resolver
+        # scripts (python3 .../scripts/*.py) are likewise NOT installer-written:
+        # the installer has never written per-script rules (they are a manual /
+        # Normal-mode addition documented in INSTALLATION.md). In the Safer
+        # profile their upstream fetch (curl / npm view) is not pre-approved
+        # anyway, so pre-approving the scripts would buy nothing.
+        "Bash(npm audit --json)",
+        "Bash(npm audit)",
+        "Bash(bundle audit check)",
+        "Bash(bundle audit check --update)",
+    ]
+
+    # Broad allowlist rules that installers at or below LAST_VULNERABLE_VERSION
+    # wrote into settings.json (issue #3). The migration in _configure_permissions
+    # deletes these — matched by EXACT string equality only, never parsed or
+    # rewritten — but ONLY from a potentially vulnerable (or older) install (gated on
+    # LEGACY_MARKER + LAST_VULNERABLE_VERSION). Newer installs are left untouched.
+    LEGACY_INSTALLER_RULES = [
         "Bash(npm view *)",
         "Bash(curl -s --max-time 10 *)",
         "Bash(npm audit *)",
@@ -1899,8 +1963,104 @@ exit 0
         "Bash(bundle audit *)",
         "Bash(gem fetch *)",
     ]
+    # Unique fingerprint of a potentially vulnerable install: no fixed version writes
+    # this exact string and nobody hand-types `-s --max-time 10`, so its presence
+    # means the allowlist was written by a potentially vulnerable installer.
+    LEGACY_MARKER = "Bash(curl -s --max-time 10 *)"
+    # Last release whose installer wrote the broad rules. Installs newer than this
+    # are never modified by the migration.
+    LAST_VULNERABLE_VERSION = "0.5.1"
 
-    def _configure_permissions(self, use_global: bool = False):
+    @staticmethod
+    def _version_le(a, b):
+        """True if dotted-int version ``a`` <= ``b``. Unparseable ``a`` counts as
+        potentially vulnerable (True) so unknown/old installs are remediated, not skipped."""
+        def _tup(v):
+            return tuple(int(p) for p in re.split(r"[.+-]", str(v))[:3] if p.isdigit())
+        ta, tb = _tup(a), _tup(b)
+        return ta <= tb if ta else True
+
+    def _installed_skill_version(self, use_global: bool = False):
+        """Version in the SKILL frontmatter already on disk for this scope, read
+        BEFORE any overwrite. None if not installed / unparseable. Gates the
+        issue #3 permission migration so newer installs are left untouched."""
+        base = (self.claude_dir if use_global else self.project_claude_dir) / "skills" / "safer-dependencies"
+        for name in ("SKILL.md", "safer-dependencies.md"):
+            try:
+                text = (base / name).read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            m = re.search(r"^version:\s*(.+?)\s*$", text, re.MULTILINE)
+            if m:
+                return m.group(1).strip()
+        return None
+
+    def _confirm_legacy_removal(self, use_global: bool = False, from_version=None):
+        """issue #3 opt-in. Show the hardening notice and ask ONLY when this
+        scope's settings.json actually holds removable legacy rules (a
+        potentially vulnerable (or older) install with the curl marker). Returns True to remove
+        (the recommended default) or False to keep. Returns True with no notice
+        when there is nothing to remove, or when running non-interactively
+        (headless updates still get hardened; apply_install prints what it removed)."""
+        settings_file = (self.claude_dir if use_global else self.project_claude_dir) / "settings.json"
+        try:
+            allow = json.loads(settings_file.read_text(encoding="utf-8")).get("permissions", {}).get("allow", [])
+        except (OSError, json.JSONDecodeError, AttributeError):
+            return True
+        version_vulnerable = from_version is None or self._version_le(from_version, self.LAST_VULNERABLE_VERSION)
+        removable = [c for c in allow if c in self.LEGACY_INSTALLER_RULES]
+        if not (version_vulnerable and self.LEGACY_MARKER in allow and removable):
+            return True  # not a potentially vulnerable install with the rules present -> silent
+        try:
+            interactive = bool(sys.stdin) and sys.stdin.isatty()
+        except (AttributeError, ValueError):
+            interactive = False
+        if not interactive:
+            return True  # headless -> recommended default (remove); notice printed by apply_install
+
+        added = [r for r in self.REQUIRED_PERMISSIONS if r not in allow]
+        print("\n" + "=" * 60)
+        print(" Security hardening - permissions")
+        print("=" * 60)
+        print(
+            "This version tightens the permissions that safer-dependencies asks\n"
+            "Claude Code to pre-approve. The initial release of this tool may have\n"
+            "suggested rules in your settings.json that were broader than necessary.\n"
+            "We recommend removing those rules; safer, precisely scoped rules are\n"
+            "added in their place.\n"
+        )
+        print("Removed from your settings.json (only the rules found there are shown):")
+        for r in removable:
+            print(f"  - {r}")
+        if added:
+            print("\nAdded (safer, precisely scoped):")
+            for r in added:
+                print(f"  - {r}")
+        print(f"\nLearn more:\n{PERMISSIONS_DOCS_URL}\n")
+        print("  [R] Remove them  (recommended)")
+        print("  [K] Keep my settings unchanged")
+        try:
+            ans = input("\nChoice [R]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return True
+        return ans not in ("k", "keep", "n", "no")
+
+    @staticmethod
+    def _atomic_write_json(path, data):
+        """Write ``data`` as JSON to ``path`` atomically: fully write a sibling
+        temp file, then ``os.replace`` it into place, so a crash mid-write can
+        never leave the destination (e.g. a user's settings.json) truncated or
+        corrupt. ``os.replace`` is atomic on POSIX and Windows within a volume.
+        """
+        tmp = path.with_name(path.name + ".tmp")
+        try:
+            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            os.replace(tmp, path)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
+
+    def _configure_permissions(self, use_global: bool = False, from_version=None, remove_legacy=True):
         """
         Merge the required Bash allowlist entries into settings.json's permissions.allow,
         idempotently. Re-runs do not produce duplicates.
@@ -1923,17 +2083,42 @@ exit 0
         permissions = existing_settings.setdefault('permissions', {})
         allow_list = permissions.setdefault('allow', [])
 
+        # issue #3 migration: remove the broad rules older installers wrote, but
+        # only when BOTH gates pass, and only lines byte-for-byte identical to
+        # ones we shipped (never parse or rewrite a user's rules):
+        #   1. LEGACY_MARKER present — the fingerprint of a potentially vulnerable install, and
+        #   2. from_version is unknown or <= LAST_VULNERABLE_VERSION.
+        # A confirmed newer install is left completely untouched.
+        removed = []
+        version_vulnerable = from_version is None or self._version_le(from_version, self.LAST_VULNERABLE_VERSION)
+        if remove_legacy and version_vulnerable and self.LEGACY_MARKER in allow_list:
+            removed = [c for c in allow_list if c in self.LEGACY_INSTALLER_RULES]
+            if removed:
+                allow_list[:] = [c for c in allow_list if c not in self.LEGACY_INSTALLER_RULES]
+
         added = [cmd for cmd in self.REQUIRED_PERMISSIONS if cmd not in allow_list]
         allow_list.extend(added)
 
-        if added or not settings_file.exists():
+        if added or removed or not settings_file.exists():
             settings_file.parent.mkdir(parents=True, exist_ok=True)
-            settings_file.write_text(json.dumps(existing_settings, indent=2))
+            # When the migration REMOVES rules from an existing settings.json,
+            # copy it to settings.json.bak first so the change is recoverable
+            # (best-effort — never block the write on the backup).
+            if removed and settings_file.exists():
+                try:
+                    shutil.copy2(settings_file,
+                                 settings_file.with_name(settings_file.name + ".bak"))
+                except OSError:
+                    pass
+            # Atomic write so a crash mid-write can never leave the live
+            # settings.json truncated or corrupt.
+            self._atomic_write_json(settings_file, existing_settings)
 
         return {
-            'updated': bool(added),
-            'permissions': {'allow': list(self.REQUIRED_PERMISSIONS)},
+            'updated': bool(added or removed),
+            'permissions': {'allow': list(allow_list)},
             'added': added,
+            'removed': removed,
         }
 
     def _generate_hook_config(self, selections, scripts_path):
