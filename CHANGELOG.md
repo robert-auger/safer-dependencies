@@ -21,6 +21,37 @@ call out any user-visible change. The full release history lives on the
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-07-06
+
+### Security
+- Hardened the `settings.json` permission allowlist safer-dependencies asks
+  Claude Code to pre-approve — reported by [@karlkfi](https://github.com/karlkfi)
+  (thank you). Removed the previously suggested overly-broad `Bash(curl -s --max-time 10 *)` rule (its
+  trailing `*` pre-approved curl to any host — an unattended exfiltration path),
+  along with the `npm view`, `pip-audit`, `gem fetch`, and `dependency-check`
+  wildcards, and pinned `npm audit` / `bundle audit` to their exact read-only
+  forms.
+- The installer now writes a minimal **Safer** default; `INSTALLATION.md`
+  documents an opt-in **Convenience** profile (`npm view` / `pip-audit` /
+  `gem fetch`) with the security trade-offs spelled out.
+- **Existing installs are remediated.** On install or update, the
+  previously-recommended broad rules are removed from your `settings.json` —
+  matched exactly, and only when the old broad `curl` rule is present and the
+  installed version is at or below the last vulnerable release (clean and newer
+  installs are left untouched). A fresh install or interactive re-install shows a
+  one-time opt-in prompt (**[R]** remove / **[K]** keep) listing exactly what it
+  will change; `update` auto-remediates and prints a notice of what it removed.
+  The edit is written atomically, and the prior `settings.json` is copied to
+  `settings.json.bak` first, so any change is fully recoverable.
+
+### Fixed
+- `checks.signatures = "block"` and `checks.first_publish_age = "block"` now
+  actually escalate to `BLOCKED:` (manifest entry removed), matching the
+  documented tier-semantics table in `skills/references/configuration.md`.
+  Previously `block` silently behaved identically to `warn` for these two
+  checks — every other check (`cve`, `abandoned`, `typosquat`, `existence`,
+  `stale`) already escalated correctly.
+
 ## [0.5.1] - 2026-07-03
 
 Documentation release: the docs were simplified and reorganized so that each

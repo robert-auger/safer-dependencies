@@ -4649,6 +4649,30 @@ def _apply_policy_to_result(out: dict, pkg: str, version: str) -> None:
                     sigs[i] = (f"BLOCKED: {pkg} — not found in registry "
                                f"(policy checks.existence=block): " + s.split("— ", 1)[-1])
                     out["blocked"] = pkg
+        # signatures → block: SIGNATURE: becomes BLOCKED (removal path)
+        if _tier("signatures", "warn") == "block":
+            for i, s in enumerate(sigs):
+                if s.startswith(f"SIGNATURE: {pkg}@"):
+                    sigs[i] = (f"BLOCKED: {pkg} — unsigned artifact "
+                               f"(policy checks.signatures=block): " + s.split("— ", 1)[-1])
+                    out["blocked"] = pkg
+        # first_publish_age → block: covers both the first-publish-date and
+        # GitHub-repo-age WARNING: variants emitted by advisory_age_checks.
+        # Matched by distinguishing substring rather than a "{pkg}@{version}"
+        # prefix: the PyPI per-package audit passes advisory_age_checks the
+        # OSV-normalized name (e.g. "Flask_SQLAlchemy" -> "flask-sqlalchemy"),
+        # which can differ from the `pkg` this function receives, while a
+        # bare "WARNING:" prefix is shared with unrelated signals (hash
+        # mismatches, multi-constraint CVE warnings) that must NOT be
+        # escalated by this tier.
+        if _tier("first_publish_age", "warn") == "block":
+            for i, s in enumerate(sigs):
+                if s.startswith("WARNING:") and (
+                        "package first published" in s
+                        or ("GitHub repository" in s and "elevated supply-chain risk" in s)):
+                    sigs[i] = (f"BLOCKED: {pkg} — newly-published package "
+                               f"(policy checks.first_publish_age=block): " + s.split("— ", 1)[-1])
+                    out["blocked"] = pkg
         # abandoned → warn: BLOCKED becomes ABANDONED-CONFIRM (no removal)
         if _tier("abandoned", "block") == "warn":
             for i, s in enumerate(sigs):
