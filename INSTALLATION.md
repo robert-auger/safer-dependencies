@@ -21,7 +21,8 @@ Complete installation guide for `safer-dependencies`. For a high-level overview 
 > `fcntl.flock` (POSIX) and `msvcrt.locking` (Windows), so concurrent Claude
 > Code sessions on the same machine are safe on every supported platform.
 > Windows users need Git for Windows (provides bash) and Python 3 on `PATH`.
-> WSL is not required.
+> WSL is not required. Hands-on testing to date has focused on macOS and
+> Windows; Linux support is exercised by the automated CI matrix.
 
 A complete install has three parts: the skill file, the five hook scripts
 (`shim.sh`, `pretooluse-bash.sh`, `posttooluse-bash.sh`, plus the Post-Agent
@@ -498,8 +499,8 @@ recommended for team / shared / production environments — replace
 
 ```bash
 git -C /tmp/safer-dependencies fetch --tags origin 2>/dev/null \
-  && git -C /tmp/safer-dependencies checkout v0.5.2 2>/dev/null \
-  || git clone --branch v0.5.2 --depth 1 https://github.com/robert-auger/safer-dependencies.git /tmp/safer-dependencies
+  && git -C /tmp/safer-dependencies checkout v0.6.0 2>/dev/null \
+  || git clone --branch v0.6.0 --depth 1 https://github.com/robert-auger/safer-dependencies.git /tmp/safer-dependencies
 ```
 
 Then re-run Step 1 of your install option as usual. The current latest

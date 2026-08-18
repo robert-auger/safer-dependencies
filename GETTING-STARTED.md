@@ -21,7 +21,7 @@ git clone https://github.com/robert-auger/safer-dependencies /tmp/safer-dependen
 python3 /tmp/safer-dependencies/skills/scripts/safer_dependencies_manager.py interactive_install
 ```
 
-The installer asks for a scope (global is recommended), explains each hook, writes the `settings.json` configuration for you, and validates the result. That configuration includes the **Bash permissions allowlist** — pre-approval for the skill's read-only check commands (`curl`, `npm view`, `pip-audit`, …). Without it, Claude prompts you to approve every one of those commands on every audit, so if you install manually instead, don't skip that step ([INSTALLATION.md → Permissions allowlist](INSTALLATION.md#permissions-allowlist)).
+The installer asks for a scope (global is recommended), explains each hook, writes the `settings.json` configuration for you, and validates the result. That configuration includes the **Bash permissions allowlist** — pre-approval for the skill's read-only check commands (the exact-form `npm audit` / `bundle audit` rules; broader tools like `curl`, `npm view`, and `pip-audit` deliberately stay prompt-gated). Without it, Claude prompts you to approve every check command on every audit, so if you install manually instead, don't skip that step ([INSTALLATION.md → Permissions allowlist](INSTALLATION.md#permissions-allowlist)).
 
 **Which hooks to pick:** say yes to all of them unless you have a reason not to. In particular, install **Post-Install alongside Intercept/Pre-Install** — Intercept and Pre-Install only audit the packages you declare, while Post-Install audits the resolved lockfile, which is where most real-world CVEs (transitive dependencies) actually live.
 
@@ -39,7 +39,7 @@ or just ask Claude: **"check safer-dependencies setup"**.
 
 ## 4. Everyday use
 
-Once installed, the hooks run automatically — you don't have to do anything. For manual checks, ask Claude in natural language:
+Once installed, the hooks run automatically — you don't have to do anything. As Claude adds or installs packages, safer-dependencies **flags risky dependencies and upgrades vulnerable versions to a safe one in place** — and blocks a known-vulnerable install before it runs — so unsafe packages are caught and corrected without you asking. For manual checks, ask Claude in natural language:
 
 - **"is django 5.0.0 safe?"** — audit a specific version before adding it
 - **"what's the safest current flask?"** — get a recommended version

@@ -1547,7 +1547,21 @@ def _audit_clause(clause: str, cwd: str | None = None) -> dict | None:
 
     checked: list[str] = []
     to_query: list[tuple[str, str]] = []
+    unresolvable: list[str] = []
     for name, version in raw_pkgs:
+        if _contains_command_substitution(name) or (
+            version and _contains_command_substitution(version)
+        ):
+            # This package operand's identity is itself a command substitution
+            # (e.g. `pip install $(cat reqs.txt)` or `foo==$(cat v)`): the
+            # concrete name/version is produced by the shell at run time and
+            # cannot be audited pre-flight. Record it so the gap surfaces as a
+            # note rather than a silent allow — but keep auditing the OTHER,
+            # concretely-pinned packages in the same command. (A substitution
+            # in an unrelated argument, e.g. `--target "$(pwd)/vendor"`, leaves
+            # the real pins fully knowable and must not suppress their audit.)
+            unresolvable.append(f"{name}=={version}" if version else name)
+            continue
         if not _is_concrete_version(version, ecosystem):
             # No version pinned, or a range. The post-write shim will audit
             # whatever the PM actually resolves and writes.
@@ -1608,23 +1622,38 @@ def _audit_clause(clause: str, cwd: str | None = None) -> dict | None:
         _log_audit(clause, ecosystem, checked, findings, notes=nonregistry_refs,
                    extra_signals=deny_signals + ask_signals, cwd=cwd)
 
+    _subst_note = (
+        "install command contains a command substitution in a package "
+        f"argument ({', '.join(unresolvable)}); safer-dependencies cannot "
+        "resolve that package at pre-flight time (its identity is produced by "
+        "the shell at run time). Concretely-pinned packages in the same "
+        "command were still audited."
+    ) if unresolvable else None
+
     if not findings and not deny_signals and not ask_signals:
+        note_parts: list[str] = []
         if nonregistry_refs:
-            note = (
+            note_parts.append(
                 "install command references a non-registry source "
                 f"({', '.join(nonregistry_refs)}); safer-dependencies "
                 "cannot audit packages from this source — confirm origin "
                 "trust manually before proceeding"
             )
-            return {"note": note}
-        return None
+        if _subst_note:
+            note_parts.append(_subst_note)
+        return {"note": "\n".join(note_parts)} if note_parts else None
 
-    _nonregistry_note = (
-        "install command also references a non-registry source "
-        f"({', '.join(nonregistry_refs)}); safer-dependencies "
-        "cannot audit packages from this source — confirm origin "
-        "trust manually before proceeding"
-    ) if nonregistry_refs else None
+    _advisory_parts: list[str] = []
+    if nonregistry_refs:
+        _advisory_parts.append(
+            "install command also references a non-registry source "
+            f"({', '.join(nonregistry_refs)}); safer-dependencies "
+            "cannot audit packages from this source — confirm origin "
+            "trust manually before proceeding"
+        )
+    if _subst_note:
+        _advisory_parts.append(_subst_note)
+    _nonregistry_note = "\n".join(_advisory_parts) if _advisory_parts else None
 
     # CVE findings are deny-class only at the default block tier; under
     # warn they fold into the ask path below (the audit log above already
@@ -1705,16 +1734,14 @@ def main() -> int:
             clauses.append(raw)
 
     for clause in clauses:
-        # Command substitution makes the package list unknowable at pre-flight
-        # time. Surface a visible note so the gap is not a silent allow.
-        if _contains_command_substitution(clause):
-            notes.append(
-                "safer-dependencies: could not analyze command (contains command "
-                f"substitution — package versions unknown at pre-flight time): "
-                f"{clause[:200]}"
-            )
-            continue
-
+        # A command substitution ($(...) / backticks) no longer skips the whole
+        # clause. A substitution in an UNRELATED argument (e.g.
+        # `pip install requests==2.6.0 --target "$(pwd)/vendor"`) leaves the
+        # concrete pins fully knowable — skipping the clause here silently
+        # dropped the pre-flight CVE audit of that pin (honest-path false
+        # negative). _audit_clause now audits the concrete pins and defers only
+        # the individual operands whose identity is itself a substitution
+        # (e.g. `pip install $(cat reqs.txt)`), surfacing a note for those.
         result = _audit_clause(clause, cwd=cwd)
         if result is None:
             continue

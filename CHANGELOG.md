@@ -21,6 +21,74 @@ call out any user-visible change. The full release history lives on the
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-16
+
+### Added
+- **New `remediate` command (and `validate --fix`)** — removes the over-broad
+  rule from the global and current-project `settings.json` on demand, run by the
+  already-installed tool. This is the dependable one-step remediation and the
+  only path that reaches the cross-scope case (rule in one scope, tool invoked
+  from another). It only ever touches a `settings.json` that exists, parses, and
+  actually contains the rule — it never scaffolds a scope, never rewrites a
+  malformed file, and never touches `permissions.deny`; it backs up to
+  `settings.json.bak` and writes atomically. `validate`'s guidance was corrected
+  (a plain update cannot remove the rule on the upgrade that delivers the fix).
+
+### Fixed
+- **The issue #3 permission migration now self-heals via the marker in
+  `settings.json`, not the installed version.** Earlier releases gated removal of
+  the over-broad `Bash(curl -s --max-time 10 *)` rule on the installed version,
+  so upgrading `0.5.1 → 0.5.2` with the plain updater left the rule in place: the
+  update is performed by the pre-update code (which never runs the new removal
+  logic), and once on a post-0.5.1 version the version gate could never fire
+  again. The migration now triggers on the **presence of that exact rule**, so
+  any install still carrying it is cleaned up on the next install/update that
+  runs the fixed code. (Consequently, a newer install that still carries the
+  marker is now remediated too, where before it was left untouched.)
+- **pnpm v6–v8 lockfiles: peer-dependency'd packages are now vulnerability-scanned.**
+  The lockfile parser dropped every package that declares peer dependencies
+  (`react-dom` and much of the React / Babel / ESLint ecosystem) from pnpm
+  v6/v7/v8 lockfiles, so a vulnerable pinned version of such a package was never
+  sent to the OSV/CVE audit. The parser now handles the `(peer@ver)` context
+  suffix that pnpm puts on `packages:` keys. A detection false negative on
+  everyday `pnpm install` output — no attacker or crafted input involved.
+- **A command substitution no longer disables the pre-install audit.** A
+  `$(…)` / backtick anywhere in a package-manager command (e.g.
+  `pip install requests==2.6.0 --target "$(pwd)/vendor"`) caused the whole
+  command to be skipped, so concretely-pinned versions were never checked before
+  install. The auditor now audits the concrete pins and defers only the
+  individual operands whose identity is itself a substitution
+  (e.g. `pip install $(cat reqs.txt)`), surfacing a note for those. Another
+  honest-path detection false negative.
+- **A "project"-scope install run from the home directory no longer corrupts
+  the global `settings.json`.** With `cwd == $HOME`, the "project" `.claude/`
+  directory *is* the global `~/.claude/`, so a project-scope install or update
+  wrote `${CLAUDE_PROJECT_DIR}`-relative hook paths into the global settings
+  file — and those paths fail to resolve in every other project, silently
+  breaking the hooks everywhere else. The installer now detects the collision
+  and coerces the install to the global scope (with a printed notice and a
+  machine-readable `coerced_scope` result flag), and scope enumeration
+  (validation, remediation, config detection) treats the single directory as
+  one scope instead of two. Already-corrupted installs self-heal on their next
+  install or update run, which strips the broken entries and rewrites them
+  against `${HOME}`.
+- **The docs no longer claim `curl`, `npm view`, and `pip-audit` are
+  pre-approved.** README's Configuration section and GETTING-STARTED still
+  described the pre-0.5.2 permissions allowlist; they now describe the Safer
+  profile that 0.5.2 actually ships (the exact-form `npm audit` /
+  `bundle audit` rules; `curl` is never pre-approved, and `npm view` /
+  `pip-audit` are opt-in via the Convenience profile). The README intro also
+  no longer overstates the Intercept hook as blocking before the write — it
+  corrects the manifest on disk right after the write lands (Shape C), and
+  the intro now says exactly that.
+
+### Changed
+- **README and GETTING-STARTED reworked for first-time users.** Clearer intro,
+  a real "Getting started" section with a working TOC link, an everyday-use
+  note in GETTING-STARTED §4 describing the automatic flag-and-upgrade
+  behavior, and a platform note in README and INSTALLATION (hands-on testing
+  to date on macOS and Windows; Linux exercised by the automated CI matrix).
+
 ## [0.5.2] - 2026-07-06
 
 ### Security
