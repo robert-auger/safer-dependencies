@@ -450,7 +450,7 @@ try:
     from safedep.version import attribution_header
     header = attribution_header()
 except Exception:
-    header = "[safer-dependencies 0.5.2]"
+    header = "[safer-dependencies 0.6.0]"
 if ctx:
     ctx = header + "\n" + ctx
 print(json.dumps({

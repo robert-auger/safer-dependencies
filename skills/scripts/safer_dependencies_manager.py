@@ -247,7 +247,32 @@ class SaferDependenciesManager:
                 interactive_install keeps the default True (first-install safety net).
                 Task 9's self_update orchestrator will pass False so a working install is
                 never downgraded to a stub.
+
+        Returns:
+            dict with ``status`` / ``summary`` / ``installed`` / ``validation``, plus
+            ``coerced_scope`` (bool): True when a requested project scope was coerced
+            to global because the working directory is the home directory (the
+            cwd==$HOME scope collision) — the machine-readable counterpart of the
+            printed notice, so callers that specifically wanted project scope can react.
         """
+        # Guard against the cwd==$HOME scope collision: a "project" install run
+        # from the home directory would write ${CLAUDE_PROJECT_DIR} hook paths into
+        # the GLOBAL ~/.claude/settings.json (project_claude_dir == claude_dir),
+        # which then fail to resolve in every OTHER project. Coerce to a global
+        # install so the hook paths use ${HOME}. Every install path (interactive,
+        # CLI, and self_update's per-scope apply) funnels through here, so this is
+        # the authoritative fix. (security_regression)
+        coerced_scope = False
+        if not use_global and self._project_equals_global():
+            print(
+                "safer-dependencies: 'project' scope requested but the working "
+                "directory is your home directory; a project install there would "
+                "corrupt the global ~/.claude/settings.json with project-relative "
+                "hook paths. Installing to the global scope instead."
+            )
+            use_global = True
+            coerced_scope = True
+
         # issue #3: read the version already installed for this scope BEFORE the
         # skill file is overwritten, so the permission migration can tell a
         # potentially vulnerable (or older) install (remediate) from a newer one (leave alone).
@@ -273,7 +298,10 @@ class SaferDependenciesManager:
         status = 'success' if validation['valid'] else 'warning'
         summary = (f'Successfully installed safer-dependencies with {len(installed_components)} components'
                    if validation['valid'] else f'Installation completed with {len(validation["issues"])} issues')
-        return {'status': status, 'summary': summary, 'installed': installed_components, 'validation': validation}
+        if coerced_scope:
+            summary += ' (requested project scope coerced to global: cwd is the home directory)'
+        return {'status': status, 'summary': summary, 'installed': installed_components,
+                'validation': validation, 'coerced_scope': coerced_scope}
 
     def self_update(self, check=False, force=False, rollback=False,
                     confirm=False, repo_url: str = REPO_URL) -> dict:
@@ -588,6 +616,35 @@ class SaferDependenciesManager:
             locations.append(f"project ({project_dir})")
         return locations
 
+    def _project_equals_global(self) -> bool:
+        """True when the project scope dir is the same directory as the global one.
+
+        This happens whenever the manager runs with ``cwd == $HOME``:
+        ``project_claude_dir`` is ``Path.cwd()/.claude``, which is then exactly
+        ``~/.claude`` — the global ``claude_dir``. Treating that one directory as a
+        separate "project" scope is what plants ``${CLAUDE_PROJECT_DIR}`` hook paths
+        into the GLOBAL ``~/.claude/settings.json``; those paths then fail to resolve
+        ("No such file or directory") in every OTHER project that has no local
+        bundle. Callers use this to collapse the collision onto the global scope.
+        """
+        try:
+            return self.project_claude_dir.resolve() == self.claude_dir.resolve()
+        except OSError:
+            return str(self.project_claude_dir) == str(self.claude_dir)
+
+    def _scope_bases(self):
+        """Return ``[(use_global, base_dir), ...]`` for each DISTINCT install scope.
+
+        Always includes the global scope. Includes the project scope only when it
+        resolves to a different directory than the global one, so a ``cwd == $HOME``
+        run can never process the single ``~/.claude`` tree as two scopes (see
+        :meth:`_project_equals_global`).
+        """
+        bases = [(True, self.claude_dir)]
+        if not self._project_equals_global():
+            bases.append((False, self.project_claude_dir))
+        return bases
+
     def _detect_installed_config(self) -> dict:
         """Return per-scope hook configuration for every installed scope.
 
@@ -608,7 +665,7 @@ class SaferDependenciesManager:
             - ``settings_file`` (pathlib.Path) — settings.json path (may not exist).
         """
         scopes = []
-        for use_global, base in ((True, self.claude_dir), (False, self.project_claude_dir)):
+        for use_global, base in self._scope_bases():
             bundle = base / "skills" / "safer-dependencies"
             if not bundle.exists():
                 continue
@@ -810,7 +867,7 @@ class SaferDependenciesManager:
 
         # issue #3: surface an un-remediated over-broad curl rule so "check
         # setup" tells the user to re-run the installer (or remove it by hand).
-        for scope_dir in (self.claude_dir, self.project_claude_dir):
+        for _use_global, scope_dir in self._scope_bases():
             try:
                 data = json.loads((scope_dir / "settings.json").read_text(encoding="utf-8"))
                 allow = data.get("permissions", {}).get("allow", [])
@@ -820,8 +877,11 @@ class SaferDependenciesManager:
                 warnings.append(
                     "settings.json still contains the over-broad rule "
                     "'Bash(curl -s --max-time 10 *)' (issue #3) — it pre-approves "
-                    "curl to any host. Re-run the installer or 'update "
-                    "safer-dependencies' to remove it, or delete it by hand."
+                    "curl to any host. Run '/safer-dependencies validate --fix' "
+                    "(or the 'remediate' command) to remove it now, or delete the "
+                    "line by hand. A plain 'update' cannot remove it on the "
+                    "upgrade that delivers the fix — that step is run by the "
+                    "older, pre-fix code."
                 )
                 break
 
@@ -830,6 +890,72 @@ class SaferDependenciesManager:
             'issues': issues,
             'warnings': warnings
         }
+
+    def remediate_permissions(self, dry_run: bool = False):
+        """issue #3 direct remediation — the reliable one-step fix.
+
+        Scan the global (``~/.claude``) and current-project (``.claude``)
+        settings.json and strip the legacy over-broad rules wherever the
+        LEGACY_MARKER is found, run by the TRUSTED already-installed manager (no
+        clone, no network, no version gate). This is the dependable path for
+        installs the update flow cannot self-heal — the update that delivers the
+        fix is executed by the user's PRE-fix manager (copy-not-execute), so the
+        fixed removal code never runs on that hop; ``remediate`` runs it directly
+        afterward. It also fixes the cross-scope case (the rule living in one
+        scope while the manager was invoked from another).
+
+        Safety (each is a hard guard, not a nicety):
+          - Only ever touches a scope whose settings.json EXISTS, PARSES, and
+            actually holds the marker in ``permissions.allow``. Never scaffolds a
+            settings.json into a scope the user never set up.
+          - A settings.json that cannot be parsed is REPORTED (warning), never
+            rewritten — so a hand-broken-but-recoverable file is not clobbered.
+          - Inspects ``permissions.allow`` only; never reads or edits
+            ``permissions.deny`` (a user may deny-list the marker to BLOCK curl).
+          - Removal itself delegates to the marker-gated ``_configure_permissions``
+            (byte-exact match, ``settings.json.bak`` backup, atomic os.replace).
+          - ``dry_run`` reports what WOULD change and writes nothing. Idempotent:
+            a second run finds no marker and is a clean no-op (no write, no .bak).
+
+        Reach limit (residual): fixes GLOBAL and the CURRENT project only; legacy
+        rules in OTHER projects' .claude/settings.json are invisible (there is no
+        registry of every project install).
+
+        Returns ``{'scopes': [{'scope','path','action', ...}], 'changed': bool}``.
+        """
+        results = []
+        changed = False
+        for use_global, base in self._scope_bases():
+            scope = "global" if use_global else "project"
+            settings_file = base / "settings.json"
+            entry = {"scope": scope, "path": str(settings_file)}
+            if not settings_file.exists():
+                results.append({**entry, "action": "absent"})
+                continue
+            try:
+                data = json.loads(settings_file.read_text(encoding="utf-8"))
+                # AttributeError is in the net (like validate_installation and
+                # _confirm_legacy_removal) so a parseable-but-unexpected shape
+                # ({"permissions": null}, a top-level array, ...) is REPORTED and
+                # skipped — never a crash that aborts the remaining scopes.
+                allow = data.get("permissions", {}).get("allow", [])
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError, AttributeError) as e:
+                results.append({**entry, "action": "unreadable",
+                                "warning": f"could not parse {settings_file} ({e}); "
+                                           "it may still contain the rule — left unmodified"})
+                continue
+            if not isinstance(allow, list) or self.LEGACY_MARKER not in allow:
+                results.append({**entry, "action": "clean"})
+                continue
+            removable = [c for c in allow if c in self.LEGACY_INSTALLER_RULES]
+            if dry_run:
+                results.append({**entry, "action": "would-remediate", "removed": removable})
+                changed = True
+                continue
+            perm = self._configure_permissions(use_global=use_global, remove_legacy=True)
+            results.append({**entry, "action": "remediated", "removed": perm.get("removed", [])})
+            changed = True
+        return {"scopes": results, "changed": changed}
 
     def _read_audit_logs_in_window(self, window: str) -> List[Dict[str, Any]]:
         """
@@ -2007,10 +2133,13 @@ exit 0
             allow = json.loads(settings_file.read_text(encoding="utf-8")).get("permissions", {}).get("allow", [])
         except (OSError, json.JSONDecodeError, AttributeError):
             return True
-        version_vulnerable = from_version is None or self._version_le(from_version, self.LAST_VULNERABLE_VERSION)
+        # Prompt only when this scope actually holds the marker + removable rules
+        # (issue #3 self-heal — marker presence, not installed version; see
+        # _configure_permissions). from_version is retained for the API but no
+        # longer gates.
         removable = [c for c in allow if c in self.LEGACY_INSTALLER_RULES]
-        if not (version_vulnerable and self.LEGACY_MARKER in allow and removable):
-            return True  # not a potentially vulnerable install with the rules present -> silent
+        if not (self.LEGACY_MARKER in allow and removable):
+            return True  # no marker / nothing removable -> silent (recommended default)
         try:
             interactive = bool(sys.stdin) and sys.stdin.isatty()
         except (AttributeError, ValueError):
@@ -2083,15 +2212,24 @@ exit 0
         permissions = existing_settings.setdefault('permissions', {})
         allow_list = permissions.setdefault('allow', [])
 
-        # issue #3 migration: remove the broad rules older installers wrote, but
-        # only when BOTH gates pass, and only lines byte-for-byte identical to
-        # ones we shipped (never parse or rewrite a user's rules):
-        #   1. LEGACY_MARKER present — the fingerprint of a potentially vulnerable install, and
-        #   2. from_version is unknown or <= LAST_VULNERABLE_VERSION.
-        # A confirmed newer install is left completely untouched.
+        # issue #3 migration (self-heal follow-up): remove the broad rules older
+        # installers wrote whenever the LEGACY_MARKER is present, matched only by
+        # byte-for-byte string equality (never parsed or rewritten). The exact
+        # `Bash(curl -s --max-time 10 *)` string is only ever written by a
+        # <=0.5.1 installer, so its presence is a sufficient, self-healing signal
+        # of an un-remediated install.
+        #
+        # This DELIBERATELY no longer gates on the installed version. Version
+        # gating was the bug (issue: 0.5.1->0.5.2 update left the rule in place):
+        # the update that delivers the fix is executed by the user's PRE-fix
+        # manager (copy-not-execute — the new code is copied in but never run
+        # mid-update), and once a user was on any post-0.5.1 version, from_version
+        # permanently failed the `<= LAST_VULNERABLE_VERSION` gate. Marker
+        # presence fires on any fixed-code run instead. `remove_legacy` (the [K]
+        # keep choice) is still honored; from_version is retained for the caller
+        # API but no longer gates.
         removed = []
-        version_vulnerable = from_version is None or self._version_le(from_version, self.LAST_VULNERABLE_VERSION)
-        if remove_legacy and version_vulnerable and self.LEGACY_MARKER in allow_list:
+        if remove_legacy and self.LEGACY_MARKER in allow_list:
             removed = [c for c in allow_list if c in self.LEGACY_INSTALLER_RULES]
             if removed:
                 allow_list[:] = [c for c in allow_list if c not in self.LEGACY_INSTALLER_RULES]
@@ -2569,6 +2707,23 @@ def main():
     command = sys.argv[1]
     manager = SaferDependenciesManager()
 
+    def _print_remediation(rem):
+        for s in rem["scopes"]:
+            act = s["action"]
+            if act == "remediated":
+                print(f"✓ {s['scope']}: removed {len(s['removed'])} over-broad rule(s) "
+                      f"from {s['path']}: {', '.join(s['removed'])}")
+            elif act == "would-remediate":
+                print(f"• {s['scope']}: WOULD remove {len(s['removed'])} over-broad rule(s) "
+                      f"from {s['path']}: {', '.join(s['removed'])} (dry-run, nothing written)")
+            elif act == "unreadable":
+                print(f"⚠ {s['scope']}: {s['warning']}")
+            elif act == "clean":
+                print(f"✓ {s['scope']}: no over-broad rule present ({s['path']})")
+            # 'absent' scopes are not installed — stay silent
+        if not rem["changed"]:
+            print("Nothing to remediate — no un-remediated over-broad rule found.")
+
     try:
         if command == "interactive_install":
             result = manager.interactive_install()
@@ -2616,7 +2771,9 @@ def main():
             else:
                 manager._print_stats_report(result)
 
-        elif command == "validate_installation":
+        elif command in ("validate_installation", "validate"):
+            if "--fix" in sys.argv[2:]:
+                _print_remediation(manager.remediate_permissions())
             result = manager.validate_installation()
             if result['valid']:
                 print("✓ Safer Dependencies installation is valid and configured correctly")
@@ -2626,6 +2783,9 @@ def main():
                     print(f"  - {issue}")
             for warning in result.get('warnings', []):
                 print(f"  ⚠ coverage: {warning}")
+
+        elif command in ("remediate", "remediate_permissions"):
+            _print_remediation(manager.remediate_permissions(dry_run="--dry-run" in sys.argv[2:]))
 
         elif command == "self_update":
             rest = sys.argv[2:]

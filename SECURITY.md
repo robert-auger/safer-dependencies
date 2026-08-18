@@ -37,7 +37,7 @@ The **latest release and the current `main` branch** are supported. Older releas
 
 | Version | Supported |
 |---------|-----------|
-| `v0.5.2` (latest) | ✅ |
+| `v0.6.0` (latest) | ✅ |
 | `main` (HEAD) | ✅ |
 | Older releases | ❌ |
 

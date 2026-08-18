@@ -87,6 +87,7 @@ def parse_yarn_lock(content: str) -> list:
 #   v9 (current default):   <pkg>@<version>:          # no leading slash
 #                           '@scope/<pkg>@<version>':
 #   v6–v8:                  /<pkg>@<version>:
+#                           /<pkg>@<version>(<peer>@<ver>):   # peer-dep context suffix
 #                           /@scope/<pkg>@<version>:
 #   v5:                     /<pkg>/<version>:
 #
@@ -95,11 +96,20 @@ def parse_yarn_lock(content: str) -> list:
 # (``resolution:``, ``engines:`` …) never match; peer-suffixed keys in the
 # ``snapshots:`` section are excluded because the section gate below turns
 # off at the next top-level key.
+#
+# v6–v8 differ from v9 in that the ``packages:`` section ITSELF carries the
+# peer-dependency context as a ``(<peer>@<ver>)`` suffix on the key, e.g.
+# ``/react-dom@18.2.0(react@18.2.0):`` (and multiple / nested groups like
+# ``/a@1(b@2)(c@3):``). The v6 pattern therefore allows an optional trailing
+# ``(...)`` group after the version. Without it the version token stopped at
+# the ``(`` and the whole key failed to match, so every peer-dep'd package
+# (react-dom, most of the Babel/ESLint/React ecosystem) parsed to nothing and
+# was silently skipped from the CVE audit.
 _PNPM_KEY_V9 = re.compile(
     r'^\s{2}[\'"]?(@[^/@\s]+/[^@\s]+|[^@\s/\'"]+)@([^\s\'"()]+)[\'"]?:'
 )
 _PNPM_KEY_V6 = re.compile(
-    r'^\s{2}[\'"]?/(@[^/@]+/[^@\s]+|[^@\s/]+)@([^\s\'"()]+)[\'"]?:'
+    r'^\s{2}[\'"]?/(@[^/@]+/[^@\s]+|[^@\s/]+)@([^\s\'"()]+)(?:\(.*\))?[\'"]?:'
 )
 _PNPM_KEY_V5 = re.compile(
     r'^\s{2}[\'"]?/(@[^/]+/[^/]+|[^/]+)/([0-9][^\s\'"()]*)[\'"]?:'

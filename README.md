@@ -1,6 +1,8 @@
 # Safer Dependencies for Claude Code
 
-Automatically checks dependencies that Claude adds through its `Write`, `Edit`, and `Bash` tools, and auto-corrects vulnerable versions in place. Runs provenance, version age, vulnerability, and hash-integrity checks across npm, PyPI, RubyGems, Maven, Go, Rust, and PHP (Composer). Coverage is scoped to writes that go through Claude's tools (Intercept Mode corrects a vulnerable pin *after* the file lands, within the same tool cycle — not before); see [CAPABILITIES.md](CAPABILITIES.md) for exactly what is and isn't covered. 
+When AI coding assistants like Claude add packages to your project, they often pick whatever version sounds right — without checking whether it has known security vulnerabilities, whether the package is still actively maintained, or whether the name is a typo away from a malicious lookalike.
+
+safer-dependencies is a security layer for Claude Code: it sits between Claude and your manifest files and runs its security checks automatically: vulnerable installs are denied before they run, and a risky version written to a manifest is corrected on disk right after the write. It detects and fixes risky dependencies — CVEs, typosquats, abandoned packages, and version-age issues, plus a cooldown period on brand-new releases — across npm, PyPI, RubyGems, Maven, Go, Rust, and PHP (Composer). See [CAPABILITIES.md](CAPABILITIES.md) for exactly what is and isn't covered.
 
 > **New here?** [GETTING-STARTED.md](GETTING-STARTED.md) takes you from zero to a working install in about five minutes.
 
@@ -10,7 +12,7 @@ Automatically checks dependencies that Claude adds through its `Write`, `Edit`, 
 
 ## Contents
 
-- [Getting started](GETTING-STARTED.md) — zero to installed in about five minutes
+- [Getting started](#getting-started) — zero to installed in about five minutes
 - [What it does](#what-it-does)
 - [How it works](#how-it-works)
   - [Normal Mode (Manual)](#normal-mode-manual)
@@ -28,11 +30,15 @@ Automatically checks dependencies that Claude adds through its `Write`, `Edit`, 
 - [Requirements](#requirements)
 - [FAQ](#faq)
 
+## Getting started
+
+**[GETTING-STARTED.md](GETTING-STARTED.md)** takes you from zero to a working install in about five minutes — prerequisites, the interactive install, and verification. For the full install reference (global/project/manual installs, Windows specifics, the [permissions allowlist](INSTALLATION.md#permissions-allowlist), updating, and uninstalling), see **[INSTALLATION.md](INSTALLATION.md)**.
+
+**Everyday use:** once the hooks are installed, there's nothing to run — safer-dependencies works automatically in the background. As Claude adds or installs packages, it **flags risky dependencies and upgrades vulnerable versions to a safe one in place** — and blocks a known-vulnerable install before it even runs — so unsafe packages are caught and corrected without you having to ask. You can still invoke it directly any time: *"is `axios@1.2.0` safe?"*, *"check safer-dependencies setup"*, or *"show safer-dependencies stats"*.
+
 ## What it does
 
-When AI coding assistants like Claude add packages to your project, they often pick whatever version sounds right — without checking whether it has known security vulnerabilities, whether the package is still actively maintained, or whether the name is a typo away from a malicious lookalike. safer-dependencies fixes that by sitting between Claude and your manifest files and running security checks automatically, before any unsafe version lands in your code.
-
-When Claude is about to add a package to your project, this skill intercepts and runs 5 checks:
+When Claude is about to add a package to your project, safer-dependencies intercepts and runs 5 checks:
 
 1. **Provenance** -- official registry, typosquat detection (npm/PyPI/RubyGems/Maven/crates.io), package age
 2. **Version age** -- picks the newest stable version published 7+ days ago (cooldown window)
@@ -321,13 +327,13 @@ Everything else install-related lives in **[INSTALLATION.md](INSTALLATION.md)**,
 
 After install, day-to-day management works via natural language to Claude — `install safer-dependencies` (re-run / change hooks), `show safer-dependencies stats`, `check safer-dependencies setup` — or the `/safer-dependencies` menu. Updating is in-session too: `/safer-dependencies update` applies the latest release (`update --check` for a dry-run, `update --rollback` to undo); see [INSTALLATION.md](INSTALLATION.md#in-session-self-updater-safer-dependencies-update) for the trust model.
 
-> **Platform note:** macOS, Linux, and Windows are supported. Windows needs Git for Windows (provides bash) and Python 3 on `PATH` — no WSL required.
+> **Platform note:** macOS, Linux, and Windows are supported. Windows needs Git for Windows (provides bash) and Python 3 on `PATH` — no WSL required. Hands-on testing to date has focused on **macOS and Windows**; Linux support is exercised by the automated CI matrix.
 
 ### Configuration
 
 Two things are configurable after install:
 
-- **Permissions allowlist** — pre-approves the skill's read-only check commands (`curl`, `npm view`, `pip-audit`, …) so audits run without an approval prompt each time. The interactive installer writes the core entries for you; manual installs add the full block by hand. Full block and rationale: [INSTALLATION.md → Permissions allowlist](INSTALLATION.md#permissions-allowlist).
+- **Permissions allowlist** — pre-approves the skill's read-only check commands (the exact-form `npm audit` / `bundle audit` rules and the skill's own resolver scripts) so audits run without an approval prompt each time; `curl` is never pre-approved, and `npm view` / `pip-audit` are opt-in via the Convenience profile. The interactive installer writes the core entries for you; manual installs add the full block by hand. Full block and rationale: [INSTALLATION.md → Permissions allowlist](INSTALLATION.md#permissions-allowlist).
 - **Security policy** — the release-age cooldown window/mode and a per-check `off`/`warn`/`block` tier for every check type, edited with `/safer-dependencies config` and stored in `~/.config/safer-dependencies/config.toml`. Schema and tier semantics: [`skills/references/configuration.md`](skills/references/configuration.md).
 
 ## Warning levels
