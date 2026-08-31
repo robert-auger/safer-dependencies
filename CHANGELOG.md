@@ -21,6 +21,16 @@ call out any user-visible change. The full release history lives on the
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-31
+
+### Changed
+- README restructured: the "How it works" mode walkthrough (all five mode
+  subsections) now follows "Warning levels", with the Contents list reordered
+  to match; a new "Changing the cooldown period" section under Install
+  documents `config set cooloff.days` / `cooloff.mode`, the
+  `SAFE_DEP_COOLOFF_*` environment overrides, and the cooloff caveats
+  (off-mode selection, CVE-fix bypass, Maven/Go not gated). (#98)
+
 ## [0.6.0] - 2026-08-16
 
 ### Added
