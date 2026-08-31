@@ -21,7 +21,7 @@ import re
 from functools import lru_cache
 from typing import Iterable, Optional
 
-SAFER_DEP_VERSION_FALLBACK = "0.6.0"
+SAFER_DEP_VERSION_FALLBACK = "0.6.1"
 
 _VERSION_LINE = re.compile(r"^version:\s*(.+?)\s*$", re.MULTILINE)
 

@@ -14,18 +14,19 @@ safer-dependencies is a security layer for Claude Code: it sits between Claude a
 
 - [Getting started](#getting-started) — zero to installed in about five minutes
 - [What it does](#what-it-does)
+- [What triggers it](#what-triggers-it)
+- [What's in this repo](#whats-in-this-repo)
+- [Supported ecosystems](#supported-ecosystems)
+- [Install](#install)
+  - [Configuration](#configuration)
+  - [Changing the cooldown period](#changing-the-cooldown-period)
+- [Warning levels](#warning-levels)
 - [How it works](#how-it-works)
   - [Normal Mode (Manual)](#normal-mode-manual)
   - [Intercept Mode (Automatic)](#intercept-mode-automatic)
   - [Pre-Install Mode (Bash Hook)](#pre-install-mode-bash-hook)
   - [Post-Install Mode (Bash Hook)](#post-install-mode-bash-hook)
   - [Post-Agent Mode (Agent Hook Pair)](#post-agent-mode-agent-hook-pair)
-- [What triggers it](#what-triggers-it)
-- [What's in this repo](#whats-in-this-repo)
-- [Supported ecosystems](#supported-ecosystems)
-- [Install](#install)
-  - [Configuration](#configuration)
-- [Warning levels](#warning-levels)
 - [Audit log](#audit-log)
 - [Requirements](#requirements)
 - [FAQ](#faq)
@@ -47,6 +48,124 @@ When Claude is about to add a package to your project, safer-dependencies interc
 5. **Abandoned & stale packages** -- known-abandoned packages (e.g. `paperclip`, `request`, `pycrypto`, `github.com/dgrijalva/jwt-go`) are hard-blocked immediately with a suggested replacement; packages with no stable release in 2+ years get an advisory `STALE:` warning. Hard-blocked packages are removed from the manifest and Claude will ask how to proceed; stale-only packages are left in place.
 
 If issues are found, Claude emits warnings and may step back to a safer version. All checks are logged to `~/.claude/safer-dependencies-audit-YYYY-MM.log` (one file per calendar month).
+
+## What triggers it
+
+The skill fires automatically when Claude:
+
+**Manifest / install operations**
+- Adds or updates a package in `package.json`, `requirements.txt`, `Gemfile`, `pom.xml`, `build.gradle`, `Cargo.toml`, `go.mod`, or any other supported manifest
+- Writes an `import`, `require`, or `use` for a package not already declared in the manifest
+- Generates or updates a lock file (checks only new/changed entries)
+- Runs a package-manager install via Bash (`npm install`, `bundle install`, `poetry install`, `uv sync`, `go mod tidy`, etc.) — Pre-Install audits the command args, Post-Install audits the resulting lockfile
+- Writes a `Dockerfile` or CI workflow (`.github/workflows/*.yml`, etc.) that embeds pinned package-manager install steps
+
+**Selection & recommendation questions**
+- Library/framework comparisons: "should I use axios or node-fetch?", "moment vs dayjs?", "which is better X or Y?"
+- Recommendation requests: "what's a good HTTP client for Python?", "recommend a logging library for Go", "what package handles CSV in Node?"
+- Version selection: "what version of Django should I use?", "latest stable Flask?"
+
+**Intent-to-use expressions (pre-add)**
+- "I want to use FastAPI for this", "I'm thinking of adding Celery", "we're looking at Prisma as the ORM", "let's use Tailwind"
+
+**Package health and trust questions**
+- "Is moment.js still maintained?", "is this gem still active?", "is X abandoned?", "is X EOL?", "can I trust this package?", "when was faker last updated?"
+
+**Scaffolding commands**
+- `npx create-react-app`, `npm create vite@latest`, `django-admin startproject`, `rails new`, `cargo new` + `cargo add`, "bootstrap a new FastAPI project"
+
+**Implicit package adds (feature requests that imply a new dependency)**
+- "Add Redis caching to the app", "connect to Postgres", "add JWT auth", "write code to send emails" — fires when no package for that capability is already in the manifest
+
+**Migration and porting**
+- "Migrate from requests to httpx", "move from CRA to Vite", "port from moment to date-fns" — audits the incoming package
+
+It does **not** fire for:
+
+- Standard library imports (`os`, `fs`, `java.util.*`, etc.)
+- Already-declared dependencies that aren't being changed
+- Academic discussion of how a package works internally ("explain React's reconciler", "how does webpack's module resolution work?") — comparison and selection questions do still fire
+- Installing OS-level apps, runtimes, or IDE extensions (Python itself, Docker, Homebrew, VS Code extensions)
+
+## What's in this repo
+
+This is a **skill + hook bundle**, not a single skill file. A complete install deploys these pieces:
+
+| File | Role |
+|---|---|
+| `skills/safer-dependencies.md` | The **skill** (`SKILL.md` once installed). Describes audit procedures and includes management mode for installation/stats. |
+| `skills/safer-dependencies-shim.sh` | `PostToolUse:Write`/`Edit` hook — audits manifest + lockfile writes and auto-corrects vulnerable versions in place (Intercept Mode). |
+| `skills/safer-dependencies-pretooluse-bash.sh` | `PreToolUse:Bash` hook — pre-flight OSV audit of package-manager install commands; denies vulnerable concrete pins before the install runs (Pre-Install Mode). |
+| `skills/safer-dependencies-posttooluse-bash.sh` | `PostToolUse:Bash` hook — post-flight audit after Bash commands; catches transitive CVEs in freshly-written lockfiles, manifests edited via `sed`/`jq`/scripts, and the resolved environment of plain `pip install` (Post-Install Mode). |
+| `skills/safer-dependencies-pretooluse-agent.sh` + `skills/safer-dependencies-posttooluse-agent.sh` | `PreToolUse:Agent` + `PostToolUse:Agent` hook pair — closes the subagent coverage gap. Modes 2–4 only fire for root-session tool calls, so any manifest a subagent writes bypasses them. Post-Agent audits whatever the subagent wrote after each Agent tool-call returns (Post-Agent Mode). |
+| `skills/scripts/` | Shared Python library (`safedep/`) and standalone resolver scripts used by all hooks. |
+| `skills/scripts/safer_dependencies_manager.py` | Management module for interactive installation, usage stats, and setup validation. |
+
+The skill file alone is not enough — without hooks, automatic invocation depends on Claude deciding to reach for the skill. Install all five pieces for full coverage; many skills and slash commands dispatch subagents internally, so the Post-Agent pair matters even if you never explicitly spawn one. (See [FAQ.md](FAQ.md#why-a-skill-alone-is-not-sufficient) for why a skill on its own can't guarantee coverage.)
+
+## Supported ecosystems
+
+| Ecosystem | Manifest | Lock file |
+|-----------|----------|-----------|
+| npm | `package.json` | `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml` |
+| PyPI | `requirements.txt`, `pyproject.toml`, `Pipfile`, `setup.py`, `setup.cfg` | `Pipfile.lock`, `poetry.lock`, `uv.lock` |
+| RubyGems | `Gemfile`, `*.gemspec` | `Gemfile.lock` |
+| Maven | `pom.xml`, `build.gradle`, `libs.versions.toml` | -- |
+| Go | `go.mod` | `go.sum` |
+| Rust | `Cargo.toml` | `Cargo.lock` |
+| PHP (Composer) | `composer.json` | `composer.lock` |
+
+## Install
+
+New to the project? Start with **[GETTING-STARTED.md](GETTING-STARTED.md)**. The short version:
+
+```bash
+git clone https://github.com/robert-auger/safer-dependencies /tmp/safer-dependencies
+python3 /tmp/safer-dependencies/skills/scripts/safer_dependencies_manager.py interactive_install
+```
+
+The installer prompts for scope (global vs project) and which hooks to enable, then writes `settings.json` for you — both the hook entries **and** the permissions allowlist that lets the skill's check commands run without an approval prompt on every audit.
+
+Everything else install-related lives in **[INSTALLATION.md](INSTALLATION.md)**, the single reference for install mechanics: manual file-by-file installs (global and project-level), Windows specifics, Post-Agent hooks, the [permissions allowlist](INSTALLATION.md#permissions-allowlist), verifying the setup, updating, pinning to a release tag, and uninstalling.
+
+After install, day-to-day management works via natural language to Claude — `install safer-dependencies` (re-run / change hooks), `show safer-dependencies stats`, `check safer-dependencies setup` — or the `/safer-dependencies` menu. Updating is in-session too: `/safer-dependencies update` applies the latest release (`update --check` for a dry-run, `update --rollback` to undo); see [INSTALLATION.md](INSTALLATION.md#in-session-self-updater-safer-dependencies-update) for the trust model.
+
+> **Platform note:** macOS, Linux, and Windows are supported. Windows needs Git for Windows (provides bash) and Python 3 on `PATH` — no WSL required. Hands-on testing to date has focused on **macOS and Windows**; Linux support is exercised by the automated CI matrix.
+
+### Configuration
+
+Two things are configurable after install:
+
+- **Permissions allowlist** — pre-approves the skill's read-only check commands (the exact-form `npm audit` / `bundle audit` rules and the skill's own resolver scripts) so audits run without an approval prompt each time; `curl` is never pre-approved, and `npm view` / `pip-audit` are opt-in via the Convenience profile. The interactive installer writes the core entries for you; manual installs add the full block by hand. Full block and rationale: [INSTALLATION.md → Permissions allowlist](INSTALLATION.md#permissions-allowlist).
+- **Security policy** — the release-age cooldown window/mode and a per-check `off`/`warn`/`block` tier for every check type, edited with `/safer-dependencies config` and stored in `~/.config/safer-dependencies/config.toml`. Schema and tier semantics: [`skills/references/configuration.md`](skills/references/configuration.md).
+
+### Changing the cooldown period
+
+The cooldown (called **cooloff** in the config) is the minimum age a release must reach before the skill will select it — default **7 days**. To change it, ask Claude or run the config command directly:
+
+```
+/safer-dependencies config set cooloff.days 14     # require releases to be 14+ days old
+/safer-dependencies config set cooloff.mode block  # gate strength: off | warn | block (default: warn)
+/safer-dependencies config unset cooloff.days      # revert to the 7-day default
+/safer-dependencies config                         # show effective values and where each comes from
+```
+
+The same verbs work outside a Claude session:
+
+```bash
+python3 skills/scripts/safer_dependencies_manager.py config set cooloff.days 14
+```
+
+The setting persists in `~/.config/safer-dependencies/config.toml` (the `[cooloff]` section); the `SAFE_DEP_COOLOFF_DAYS` and `SAFE_DEP_COOLOFF_MODE` environment variables override the file per-session. Three behaviors to know: `mode = "off"` removes the age filter from version selection entirely; a CVE-driven rewrite bypasses the gate, so a security fix is never held back for being too new; and the gate covers npm, PyPI, RubyGems, and crates.io — Maven and Go are intentionally not gated. Full semantics: [`skills/references/configuration.md`](skills/references/configuration.md).
+
+## Warning levels
+
+| Level | Meaning | Example |
+|-------|---------|---------|
+| CRITICAL | Stop and ask user | Typosquat detected, tampered signature |
+| HIGH | Warn and proceed | Known CVE, package < 30 days old |
+| MEDIUM | Warn and proceed | Version < 7 days old, missing signature |
+| LOW | Warn and proceed | Unsigned Ruby gem (expected) |
 
 ## How it works
 
@@ -245,105 +364,6 @@ manifest or lockfile (`npm install -g …`): there is nothing to scan. Like the
 other hooks, it fails open — any error (missing sentinel, missing shim,
 unreadable payload) exits 0 silently. Full design rationale lives in
 `skills/safer-dependencies.md`.
-
-## What triggers it
-
-The skill fires automatically when Claude:
-
-**Manifest / install operations**
-- Adds or updates a package in `package.json`, `requirements.txt`, `Gemfile`, `pom.xml`, `build.gradle`, `Cargo.toml`, `go.mod`, or any other supported manifest
-- Writes an `import`, `require`, or `use` for a package not already declared in the manifest
-- Generates or updates a lock file (checks only new/changed entries)
-- Runs a package-manager install via Bash (`npm install`, `bundle install`, `poetry install`, `uv sync`, `go mod tidy`, etc.) — Pre-Install audits the command args, Post-Install audits the resulting lockfile
-- Writes a `Dockerfile` or CI workflow (`.github/workflows/*.yml`, etc.) that embeds pinned package-manager install steps
-
-**Selection & recommendation questions**
-- Library/framework comparisons: "should I use axios or node-fetch?", "moment vs dayjs?", "which is better X or Y?"
-- Recommendation requests: "what's a good HTTP client for Python?", "recommend a logging library for Go", "what package handles CSV in Node?"
-- Version selection: "what version of Django should I use?", "latest stable Flask?"
-
-**Intent-to-use expressions (pre-add)**
-- "I want to use FastAPI for this", "I'm thinking of adding Celery", "we're looking at Prisma as the ORM", "let's use Tailwind"
-
-**Package health and trust questions**
-- "Is moment.js still maintained?", "is this gem still active?", "is X abandoned?", "is X EOL?", "can I trust this package?", "when was faker last updated?"
-
-**Scaffolding commands**
-- `npx create-react-app`, `npm create vite@latest`, `django-admin startproject`, `rails new`, `cargo new` + `cargo add`, "bootstrap a new FastAPI project"
-
-**Implicit package adds (feature requests that imply a new dependency)**
-- "Add Redis caching to the app", "connect to Postgres", "add JWT auth", "write code to send emails" — fires when no package for that capability is already in the manifest
-
-**Migration and porting**
-- "Migrate from requests to httpx", "move from CRA to Vite", "port from moment to date-fns" — audits the incoming package
-
-It does **not** fire for:
-
-- Standard library imports (`os`, `fs`, `java.util.*`, etc.)
-- Already-declared dependencies that aren't being changed
-- Academic discussion of how a package works internally ("explain React's reconciler", "how does webpack's module resolution work?") — comparison and selection questions do still fire
-- Installing OS-level apps, runtimes, or IDE extensions (Python itself, Docker, Homebrew, VS Code extensions)
-
-## What's in this repo
-
-This is a **skill + hook bundle**, not a single skill file. A complete install deploys these pieces:
-
-| File | Role |
-|---|---|
-| `skills/safer-dependencies.md` | The **skill** (`SKILL.md` once installed). Describes audit procedures and includes management mode for installation/stats. |
-| `skills/safer-dependencies-shim.sh` | `PostToolUse:Write`/`Edit` hook — audits manifest + lockfile writes and auto-corrects vulnerable versions in place (Intercept Mode). |
-| `skills/safer-dependencies-pretooluse-bash.sh` | `PreToolUse:Bash` hook — pre-flight OSV audit of package-manager install commands; denies vulnerable concrete pins before the install runs (Pre-Install Mode). |
-| `skills/safer-dependencies-posttooluse-bash.sh` | `PostToolUse:Bash` hook — post-flight audit after Bash commands; catches transitive CVEs in freshly-written lockfiles, manifests edited via `sed`/`jq`/scripts, and the resolved environment of plain `pip install` (Post-Install Mode). |
-| `skills/safer-dependencies-pretooluse-agent.sh` + `skills/safer-dependencies-posttooluse-agent.sh` | `PreToolUse:Agent` + `PostToolUse:Agent` hook pair — closes the subagent coverage gap. Modes 2–4 only fire for root-session tool calls, so any manifest a subagent writes bypasses them. Post-Agent audits whatever the subagent wrote after each Agent tool-call returns (Post-Agent Mode). |
-| `skills/scripts/` | Shared Python library (`safedep/`) and standalone resolver scripts used by all hooks. |
-| `skills/scripts/safer_dependencies_manager.py` | Management module for interactive installation, usage stats, and setup validation. |
-
-The skill file alone is not enough — without hooks, automatic invocation depends on Claude deciding to reach for the skill. Install all five pieces for full coverage; many skills and slash commands dispatch subagents internally, so the Post-Agent pair matters even if you never explicitly spawn one. (See [FAQ.md](FAQ.md#why-a-skill-alone-is-not-sufficient) for why a skill on its own can't guarantee coverage.)
-
-## Supported ecosystems
-
-| Ecosystem | Manifest | Lock file |
-|-----------|----------|-----------|
-| npm | `package.json` | `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml` |
-| PyPI | `requirements.txt`, `pyproject.toml`, `Pipfile`, `setup.py`, `setup.cfg` | `Pipfile.lock`, `poetry.lock`, `uv.lock` |
-| RubyGems | `Gemfile`, `*.gemspec` | `Gemfile.lock` |
-| Maven | `pom.xml`, `build.gradle`, `libs.versions.toml` | -- |
-| Go | `go.mod` | `go.sum` |
-| Rust | `Cargo.toml` | `Cargo.lock` |
-| PHP (Composer) | `composer.json` | `composer.lock` |
-
-## Install
-
-New to the project? Start with **[GETTING-STARTED.md](GETTING-STARTED.md)**. The short version:
-
-```bash
-git clone https://github.com/robert-auger/safer-dependencies /tmp/safer-dependencies
-python3 /tmp/safer-dependencies/skills/scripts/safer_dependencies_manager.py interactive_install
-```
-
-The installer prompts for scope (global vs project) and which hooks to enable, then writes `settings.json` for you — both the hook entries **and** the permissions allowlist that lets the skill's check commands run without an approval prompt on every audit.
-
-Everything else install-related lives in **[INSTALLATION.md](INSTALLATION.md)**, the single reference for install mechanics: manual file-by-file installs (global and project-level), Windows specifics, Post-Agent hooks, the [permissions allowlist](INSTALLATION.md#permissions-allowlist), verifying the setup, updating, pinning to a release tag, and uninstalling.
-
-After install, day-to-day management works via natural language to Claude — `install safer-dependencies` (re-run / change hooks), `show safer-dependencies stats`, `check safer-dependencies setup` — or the `/safer-dependencies` menu. Updating is in-session too: `/safer-dependencies update` applies the latest release (`update --check` for a dry-run, `update --rollback` to undo); see [INSTALLATION.md](INSTALLATION.md#in-session-self-updater-safer-dependencies-update) for the trust model.
-
-> **Platform note:** macOS, Linux, and Windows are supported. Windows needs Git for Windows (provides bash) and Python 3 on `PATH` — no WSL required. Hands-on testing to date has focused on **macOS and Windows**; Linux support is exercised by the automated CI matrix.
-
-### Configuration
-
-Two things are configurable after install:
-
-- **Permissions allowlist** — pre-approves the skill's read-only check commands (the exact-form `npm audit` / `bundle audit` rules and the skill's own resolver scripts) so audits run without an approval prompt each time; `curl` is never pre-approved, and `npm view` / `pip-audit` are opt-in via the Convenience profile. The interactive installer writes the core entries for you; manual installs add the full block by hand. Full block and rationale: [INSTALLATION.md → Permissions allowlist](INSTALLATION.md#permissions-allowlist).
-- **Security policy** — the release-age cooldown window/mode and a per-check `off`/`warn`/`block` tier for every check type, edited with `/safer-dependencies config` and stored in `~/.config/safer-dependencies/config.toml`. Schema and tier semantics: [`skills/references/configuration.md`](skills/references/configuration.md).
-
-## Warning levels
-
-| Level | Meaning | Example |
-|-------|---------|---------|
-| CRITICAL | Stop and ask user | Typosquat detected, tampered signature |
-| HIGH | Warn and proceed | Known CVE, package < 30 days old |
-| MEDIUM | Warn and proceed | Version < 7 days old, missing signature |
-| LOW | Warn and proceed | Unsigned Ruby gem (expected) |
 
 ## Audit log
 

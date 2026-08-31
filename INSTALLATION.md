@@ -499,8 +499,8 @@ recommended for team / shared / production environments — replace
 
 ```bash
 git -C /tmp/safer-dependencies fetch --tags origin 2>/dev/null \
-  && git -C /tmp/safer-dependencies checkout v0.6.0 2>/dev/null \
-  || git clone --branch v0.6.0 --depth 1 https://github.com/robert-auger/safer-dependencies.git /tmp/safer-dependencies
+  && git -C /tmp/safer-dependencies checkout v0.6.1 2>/dev/null \
+  || git clone --branch v0.6.1 --depth 1 https://github.com/robert-auger/safer-dependencies.git /tmp/safer-dependencies
 ```
 
 Then re-run Step 1 of your install option as usual. The current latest
